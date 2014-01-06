@@ -16,8 +16,6 @@
 
 module Flycheck.PrintCabal where
 
-import qualified Data.AttoLisp as L
-import qualified Data.ByteString.Lazy as BS
 import Distribution.Verbosity (silent)
 import Distribution.PackageDescription (PackageDescription
                                        ,allBuildInfo
@@ -28,29 +26,19 @@ import System.Environment (getArgs)
 import System.Exit (exitFailure)
 
 
-instance L.ToLisp PackageDescription where
-    toLisp pkgdesc = L.mkStruct "package-description"
-                     [ field "version" (1 :: Int)
-                     , field "source-directories"  (collectSourceDirs pkgdesc)]
-        where field n v = L.DotList [L.Symbol n] (L.toLisp v)
+collectSourceDirectories :: PackageDescription -> [FilePath]
+collectSourceDirectories = concatMap hsSourceDirs . allBuildInfo
 
 
-collectSourceDirs :: PackageDescription -> [FilePath]
-collectSourceDirs = concatMap hsSourceDirs . allBuildInfo
-
-printToLisp :: L.ToLisp a => a -> IO ()
-printToLisp = BS.putStr.L.encode
-
-
-dumpCabalFile :: FilePath -> IO ()
-dumpCabalFile filename = do
-  genericDesc <- readPackageDescription silent filename
-  printToLisp (flattenPackageDescription genericDesc)
+getSourceDirectories :: FilePath -> IO [FilePath]
+getSourceDirectories cabalFile = do
+  desc <- readPackageDescription silent cabalFile
+  return (collectSourceDirectories (flattenPackageDescription desc))
 
 
 main :: IO ()
 main = do
   args <- getArgs
   case args of
-    [] -> exitFailure
-    filename : _ -> dumpCabalFile filename
+    [filename] -> getSourceDirectories filename >>= mapM_ putStrLn
+    _ -> exitFailure

@@ -1,4 +1,4 @@
-;;; flycheck-haskell.el --- Improved Haskell support for Flycheck -*- lexical-binding: t; -*-
+;;; flycheck-haskell.el --- Flycheck: Haskell configuration -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2014  Sebastian Wiesner
 
@@ -6,7 +6,7 @@
 ;; URL: https://github.com/flycheck/flycheck-haskell
 ;; Keywords: tools, convenience
 ;; Version: 0.2-cvs
-;; Package-Requires: ((flycheck "0.16"))
+;; Package-Requires: ((flycheck "0.16") (haskell-mode "13.7"))
 
 ;; This file is not part of GNU Emacs.
 
@@ -25,10 +25,15 @@
 
 ;;; Commentary:
 
-;; Improve Haskell support in Flycheck.
+;; Configure Haskell syntax checking by Flycheck.
 
-;; Configure Flycheck automatically based on the Cabal file of a project, and on
-;; active Cabal sandboxes.
+;;;; Cabal support
+
+;; Try to find Cabal project files for Haskell buffers, and configure the
+;; Haskell syntax checkers in Flycheck according to the contents of the Cabal
+;; file:
+;;
+;; - Add all source directories to the GHC search path
 
 ;;;; Setup
 
@@ -36,20 +41,52 @@
 
 ;;; Code:
 
+(require 'haskell-cabal)
 (require 'flycheck)
+(require 'f)
 (require 'dash)
+(require 'rx)
 
-(defun flycheck-haskell-cabal-locate-cabal-file ()
-  )
+
+;;;; Customization
 
-(defun flycheck-haskell-cabal-source-directories (cabal-file)
-  )
+(defgroup flycheck-haskell nil
+  "Haskell support for Flycheck."
+  :prefix "flycheck-haskell-"
+  :group 'flycheck
+  :link '(url-link :tag "Github" "https://github.com/flycheck/flycheck-haskell"))
 
-(defun flycheck-haskell-find-sandbox-package-db ()
-  )
+(defcustom flycheck-haskell-runhaskell "runhaskell"
+  "Path to the `runhaskell' executable."
+  :type `(file :must-match t)
+  :group 'flycheck-haskell)
 
-(defvar-local flycheck-haskell-cabal-file nil
-  "The Cabal file for the current buffer.")
+
+;;;; Cabal support
+(defconst flycheck-haskell-helpers-directory
+  (f-join (f-dirname (f-this-file)) "helpers")
+  "Directory of helpers.")
+
+(defconst flycheck-haskell-get-source-directories
+  (f-join flycheck-haskell-helpers-directory "get-source-directories.hs")
+  "Helper to get source directories from a Cabal project.")
+
+(defun flycheck-haskell-get-source-directories (cabal-file)
+  "Get the source directories from a CABAL-FILE.
+
+CABAL-FILE is a string denoting a Cabal project file.
+
+Return a list of source directories.  Signal an error if
+CABAL-FILE is not a valid project file, or if
+`flycheck-haskell-runhaskell' does not exist."
+  (let ((cabal-dir (f-dirname cabal-file))
+        (source-files (process-lines flycheck-haskell-runhaskell
+                                     flycheck-haskell-get-source-directories
+                                     cabal-file)))
+    ;; Expand all relative file names from the Cabal file
+    (or (--map (f-join cabal-dir it) source-files)
+        ;; Fall back to the root source directory
+        (list cabal-dir))))
 
 ;;;###autoload
 (defun flycheck-haskell-setup ()
@@ -62,10 +99,9 @@ account.
 Also search for Cabal sandboxes and add them to the module search
 path as well."
   (when (buffer-file-name)
-    (-when-let (cabal-file (flycheck-haskell-locate-cabal-file))
-      (setq flycheck-haskell-cabal-file cabal-file)
+    (-when-let (cabal-file (haskell-cabal-find-file))
       (setq flycheck-ghc-search-path
-            (append (flycheck-haskell-get-source-dirs cabal-file)
+            (append (flycheck-haskell-get-source-directories cabal-file)
                     flycheck-ghc-search-path))
       (-when-let (sandbox-db (flycheck-haskell-find-sandbox-package-db))
         (push sandbox-db flycheck-ghc-package-databases)
