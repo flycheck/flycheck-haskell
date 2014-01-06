@@ -88,6 +88,36 @@ CABAL-FILE is not a valid project file, or if
         ;; Fall back to the root source directory
         (list cabal-dir))))
 
+(defconst flycheck-haskell-sandbox-config "cabal.sandbox.config"
+  "The file name of a Cabal sandbox configuration.")
+
+(defconst flycheck-haskell-package-db-re
+  (rx line-start (zero-or-more (any space)) "package-db:"
+      (zero-or-more (any space))
+      (group (one-or-more (not (any space))))
+      (zero-or-more (any space) line-end))
+  "Regular expression to parse the package db directory.")
+
+(defun flycheck-haskell-get-package-db (sandbox-config-file)
+  "Get the package database directory from SANDBOX-CONFIG-FILE.
+
+Return the package database directory as string, or nil, if the
+database was not found."
+  (with-temp-buffer
+    (insert-file-contents sandbox-config-file)
+    (goto-char (point-min))
+    (when (re-search-forward flycheck-haskell-package-db-re nil 'noerror)
+      (match-string 1))))
+
+(defun flycheck-haskell-find-sandbox-config ()
+  "Find Cabal sandbox configuration for the current buffer.
+
+Return the absolute path of the sandbox configuration file as
+string, or nil, if no sandbox configuration file was found."
+  (-when-let (root-dir (locate-dominating-file (buffer-file-name)
+                                               flycheck-haskell-sandbox-config))
+    (f-join root-dir flycheck-haskell-sandbox-config)))
+
 ;;;###autoload
 (defun flycheck-haskell-setup ()
   "Setup Haskell support for Flycheck.
@@ -103,8 +133,9 @@ path as well."
       (setq flycheck-ghc-search-path
             (append (flycheck-haskell-get-source-directories cabal-file)
                     flycheck-ghc-search-path))
-      (-when-let (sandbox-db (flycheck-haskell-find-sandbox-package-db))
-        (push sandbox-db flycheck-ghc-package-databases)
+      (-when-let* ((config (flycheck-haskell-find-sandbox-config))
+                   (package-db (flycheck-haskell-get-package-db config)))
+        (push package-db flycheck-ghc-package-databases)
         (setq flycheck-ghc-no-user-package-database t)))))
 
 (provide 'flycheck-haskell)
