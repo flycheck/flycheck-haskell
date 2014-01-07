@@ -35,6 +35,12 @@
 ;;
 ;; - Add all source directories to the GHC search path
 
+;;;; Cabal sandboxes
+
+;; Try to find a Cabal sandbox configuration for this project, and configure the
+;; Haskell syntax checkers in Flycheck to use the package database from the
+;; Sandbox.
+
 ;;;; Setup
 
 ;; (add-hook 'haskell-mode-hook #'flycheck-haskell-setup)
