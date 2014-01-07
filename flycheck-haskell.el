@@ -57,7 +57,10 @@
   :link '(url-link :tag "Github" "https://github.com/flycheck/flycheck-haskell"))
 
 (defcustom flycheck-haskell-runhaskell "runhaskell"
-  "Path to the `runhaskell' executable."
+  "Path to the `runhaskell' executable.
+
+This library uses `runhaskell' to run various Haskell helper
+scripts to extract information from Cabal files."
   :type `(file :must-match t)
   :group 'flycheck-haskell)
 
