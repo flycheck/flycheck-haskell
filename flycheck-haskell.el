@@ -6,7 +6,7 @@
 ;; URL: https://github.com/flycheck/flycheck-haskell
 ;; Keywords: tools, convenience
 ;; Version: 0.1-cvs
-;; Package-Requires: ((flycheck "0.16") (haskell-mode "13.7"))
+;; Package-Requires: ((flycheck "0.16") (haskell-mode "13.7") (dash "2.4.0") (f "0.11.0"))
 
 ;; This file is not part of GNU Emacs.
 
