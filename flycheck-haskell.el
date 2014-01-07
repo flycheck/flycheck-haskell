@@ -43,7 +43,7 @@
 
 ;;;; Setup
 
-;; (add-hook 'haskell-mode-hook #'flycheck-haskell-setup)
+;; (add-hook 'flycheck-mode-hook #'flycheck-haskell-setup)
 
 ;;; Code:
 
