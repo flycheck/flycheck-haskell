@@ -5,7 +5,7 @@
 ;; Author: Sebastian Wiesner <lunaryorn@gmail.com>
 ;; URL: https://github.com/flycheck/flycheck-haskell
 ;; Keywords: tools, convenience
-;; Version: 0.2-cvs
+;; Version: 0.1-cvs
 ;; Package-Requires: ((flycheck "0.16") (haskell-mode "13.7"))
 
 ;; This file is not part of GNU Emacs.
