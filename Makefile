@@ -18,12 +18,13 @@ compile : $(OBJECTS)
 .PHONY: package
 package : $(PACKAGE)
 
-$(PACKAGE) : $(SRCS) $(HELPER_SRCS)
+$(PACKAGE) : $(SRCS) $(HELPER_SRCS) flycheck-haskell-pkg.el
 	rm -rf flycheck-haskell-$(VERSION)
 	mkdir -p flycheck-haskell-$(VERSION)
 	mkdir -p flycheck-haskell-$(VERSION)/helpers
 	cp -f $(SRCS) flycheck-haskell-$(VERSION)
 	cp -f $(HELPER_SRCS) flycheck-haskell-$(VERSION)/helpers
+	cp -f flycheck-haskell-pkg.el flycheck-haskell-$(VERSION)
 	tar cf $(PACKAGE) flycheck-haskell-$(VERSION)
 	rm -rf flycheck-haskell-$(VERSION)
 
