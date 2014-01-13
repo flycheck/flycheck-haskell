@@ -1,4 +1,5 @@
 *.elc
 /flycheck-haskell-*.tar
+/flycheck-haskell-pkg.el
 
 /.cask/
