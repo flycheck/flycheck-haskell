@@ -10,7 +10,6 @@ export EMACS
 SRCS = flycheck-haskell.el
 OBJECTS = $(SRCS:.el=.elc)
 HELPER_SRCS = helpers/get-source-directories.hs
-PACKAGE_SRCS = $(SRCS) $(HELPER_SRCS)
 PACKAGE = flycheck-haskell-$(VERSION).tar
 
 .PHONY: compile
@@ -19,10 +18,12 @@ compile : $(OBJECTS)
 .PHONY: package
 package : $(PACKAGE)
 
-$(PACKAGE) : $(PACKAGE_SRCS)
+$(PACKAGE) : $(SRCS) $(HELPER_SRCS)
 	rm -rf flycheck-haskell-$(VERSION)
 	mkdir -p flycheck-haskell-$(VERSION)
-	cp -f $(PACKAGE_SRCS) flycheck-haskell-$(VERSION)
+	mkdir -p flycheck-haskell-$(VERSION)/helpers
+	cp -f $(SRCS) flycheck-haskell-$(VERSION)
+	cp -f $(HELPER_SRCS) flycheck-haskell-$(VERSION)/helpers
 	tar cf $(PACKAGE) flycheck-haskell-$(VERSION)
 	rm -rf flycheck-haskell-$(VERSION)
 
