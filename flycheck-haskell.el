@@ -149,4 +149,9 @@ path as well."
 
 (provide 'flycheck-haskell)
 
+;; Local Variables:
+;; indent-tabs-mode: nil
+;; coding: utf-8
+;; End:
+
 ;;; flycheck-haskell.el ends here
