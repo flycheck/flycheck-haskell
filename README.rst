@@ -25,14 +25,14 @@ In your Cask_ file:
    (source gnu)
    (source melpa)
 
-   (depends-on "flycheck-cask")
+   (depends-on "flycheck-haskell")
 
 In your `init.el`:
 
 .. code-block:: cl
 
    (eval-after-load 'flycheck
-     '(add-hook 'flycheck-mode-hook #'flycheck-cask-setup))
+     '(add-hook 'flycheck-mode-hook #'flycheck-haskell-setup))
 
 Usage
 =====
