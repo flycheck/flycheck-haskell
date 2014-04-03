@@ -1,7 +1,6 @@
 EMACS = emacs
 EMACSFLAGS =
 CASK = cask
-VERSION := $(shell EMACS=$(EMACS) $(CASK) version)
 PKGDIR := $(shell EMACS=$(EMACS) $(CASK) package-directory)
 
 # Export the used EMACS to recipe environments
@@ -12,43 +11,35 @@ OBJECTS = $(SRCS:.el=.elc)
 HELPER_SRCS = helpers/get-source-directories.hs
 PACKAGE = flycheck-haskell-$(VERSION).tar
 
-.PHONY: compile
+.PHONY: compile dist \
+	clean clean-elc clean-dist clean-deps \
+	deps
+
+# Build targets
 compile : $(OBJECTS)
 
-.PHONY: package
-package : $(PACKAGE)
+dist :
+	$(CASK) package
 
-$(PACKAGE) : $(SRCS) $(HELPER_SRCS) flycheck-haskell-pkg.el
-	rm -rf flycheck-haskell-$(VERSION)
-	mkdir -p flycheck-haskell-$(VERSION)
-	mkdir -p flycheck-haskell-$(VERSION)/helpers
-	cp -f $(SRCS) flycheck-haskell-$(VERSION)
-	cp -f $(HELPER_SRCS) flycheck-haskell-$(VERSION)/helpers
-	cp -f flycheck-haskell-pkg.el flycheck-haskell-$(VERSION)
-	tar cf $(PACKAGE) flycheck-haskell-$(VERSION)
-	rm -rf flycheck-haskell-$(VERSION)
+# Support targets
+deps : $(PKGDIR)
 
-.PHONY: clean-all
-clean-all : clean clean-pkgdir
+# Cleanup targets
+clean : clean-elc clean-dist clean-deps
 
-.PHONY: clean
-clean :
+clean-elc :
 	rm -rf $(OBJECTS)
-	rm -rf flycheck-haskell-*.tar flycheck-haskell-pkg.el
 
-.PHONY: packages
-packages : $(PKGDIR)
+clean-dist :
+	rm -rf $(DISTDIR)
 
-.PHONY: clean-pkgdir
-clean-pkgdir :
+clean-deps :
 	rm -rf $(PKGDIR)
 
+# File targets
 %.elc : %.el $(PKGDIR)
 	$(CASK) exec $(EMACS) -Q --batch $(EMACSFLAGS) -f batch-byte-compile $<
 
 $(PKGDIR) : Cask
 	$(CASK) install
 	touch $(PKGDIR)
-
-flycheck-haskell-pkg.el : Cask
-	$(CASK) package
