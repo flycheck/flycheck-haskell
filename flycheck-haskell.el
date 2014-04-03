@@ -127,6 +127,18 @@ string, or nil, if no sandbox configuration file was found."
                                                flycheck-haskell-sandbox-config))
     (f-join root-dir flycheck-haskell-sandbox-config)))
 
+(defun flycheck-haskell-configure ()
+  "Set paths and package database for the current project."
+  (when (buffer-file-name)
+    (-when-let (cabal-file (haskell-cabal-find-file))
+      (setq flycheck-ghc-search-path
+            (append (flycheck-haskell-get-source-directories cabal-file)
+                    flycheck-ghc-search-path))
+      (-when-let* ((config (flycheck-haskell-find-sandbox-config))
+                   (package-db (flycheck-haskell-get-package-db config)))
+        (push package-db flycheck-ghc-package-databases)
+        (setq flycheck-ghc-no-user-package-database t)))))
+
 ;;;###autoload
 (defun flycheck-haskell-setup ()
   "Setup Haskell support for Flycheck.
@@ -137,15 +149,7 @@ account.
 
 Also search for Cabal sandboxes and add them to the module search
 path as well."
-  (when (buffer-file-name)
-    (-when-let (cabal-file (haskell-cabal-find-file))
-      (setq flycheck-ghc-search-path
-            (append (flycheck-haskell-get-source-directories cabal-file)
-                    flycheck-ghc-search-path))
-      (-when-let* ((config (flycheck-haskell-find-sandbox-config))
-                   (package-db (flycheck-haskell-get-package-db config)))
-        (push package-db flycheck-ghc-package-databases)
-        (setq flycheck-ghc-no-user-package-database t)))))
+  (add-hook 'hack-local-variables-hook #'flycheck-haskell-configure))
 
 (provide 'flycheck-haskell)
 
