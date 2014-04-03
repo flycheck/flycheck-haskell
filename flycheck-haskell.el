@@ -34,6 +34,7 @@
 ;; file:
 ;;
 ;; - Add all source directories to the GHC search path
+;; - Add auto-generated files from Cabal to the GHC search path
 
 ;;;; Cabal sandboxes
 
