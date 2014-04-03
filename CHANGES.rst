@@ -2,8 +2,8 @@
  Changelog
 ===========
 
-0.2 (in development)
-====================
+0.2 (Apr 3, 2014)
+=================
 
 - Postpone setup until after local variables were set up
 - Add auto-generated files from Cabal to GHC path
