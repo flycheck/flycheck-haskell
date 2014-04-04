@@ -55,7 +55,7 @@
 (require 'rx)
 
 
-;;;; Customization
+;;; Customization
 
 (defgroup flycheck-haskell nil
   "Haskell support for Flycheck."
@@ -72,7 +72,7 @@ scripts to extract information from Cabal files."
   :group 'flycheck-haskell)
 
 
-;;;; Cabal support
+;;; Cabal support
 (defconst flycheck-haskell-helpers-directory
   (f-join (f-dirname (f-this-file)) "helpers")
   "Directory of helpers.")
