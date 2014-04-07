@@ -138,11 +138,11 @@ string, or nil, if no sandbox configuration file was found."
       ;; Add auto-generated Cabal files to search path
       (push (expand-file-name "dist/build/autogen"
                               (file-name-directory cabal-file))
-            flycheck-ghc-search-path)
-      (-when-let* ((config (flycheck-haskell-find-sandbox-config))
-                   (package-db (flycheck-haskell-get-package-db config)))
-        (push package-db flycheck-ghc-package-databases)
-        (setq flycheck-ghc-no-user-package-database t)))))
+            flycheck-ghc-search-path))
+    (-when-let* ((config (flycheck-haskell-find-sandbox-config))
+                 (package-db (flycheck-haskell-get-package-db config)))
+      (push package-db flycheck-ghc-package-databases)
+      (setq flycheck-ghc-no-user-package-database t))))
 
 ;;;###autoload
 (defun flycheck-haskell-setup ()
