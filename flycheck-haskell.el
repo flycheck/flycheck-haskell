@@ -132,13 +132,13 @@ string, or nil, if no sandbox configuration file was found."
   "Set paths and package database for the current project."
   (when (buffer-file-name)
     (-when-let (cabal-file (haskell-cabal-find-file))
-      (setq flycheck-ghc-search-path
-            (append (flycheck-haskell-get-source-directories cabal-file)
-                    flycheck-ghc-search-path))
-      ;; Add auto-generated Cabal files to search path
-      (push (expand-file-name "dist/build/autogen"
-                              (file-name-directory cabal-file))
-            flycheck-ghc-search-path))
+      (let ((build-dir (expand-file-name "dist/build"
+                                         (file-name-directory cabal-file))))
+        (setq flycheck-ghc-search-path
+              (append (flycheck-haskell-get-source-directories cabal-file)
+                      ;; Auto-generated and compiled files from Cabal
+                      (list build-dir (expand-file-name "autogen" build-dir))
+                      flycheck-ghc-search-path))))
     (-when-let* ((config (flycheck-haskell-find-sandbox-config))
                  (package-db (flycheck-haskell-get-package-db config)))
       (push package-db flycheck-ghc-package-databases)

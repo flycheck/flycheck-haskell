@@ -6,6 +6,7 @@ master (in development)
 =======================
 
 - Use sandboxes even without Cabal files
+- Add build files from Cabal to GHC path
 
 0.2 (Apr 3, 2014)
 =================
