@@ -1,4 +1,4 @@
-;;; flycheck-haskell.el --- Flycheck: Haskell configuration -*- lexical-binding: t; -*-
+;;; flycheck-haskell.el --- Flycheck: Cabal projects and sandboxes -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2014 Sebastian Wiesner <lunaryorn@gmail.com>
 
