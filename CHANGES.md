@@ -1,8 +1,8 @@
 Changelog
 =========
 
-master (in development)
------------------------
+0.3 (Apr 14, 2014)
+------------------
 
 - Use sandboxes even without Cabal files
 - Add build files from Cabal to GHC path
