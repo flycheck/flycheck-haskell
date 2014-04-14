@@ -1,4 +1,4 @@
-flycheck-haskell — Haskell for Flycheck
+flycheck-haskell — Flycheck for Haskell
 =======================================
 
 Configure [Flycheck][] for Haskell:
