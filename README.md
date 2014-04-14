@@ -12,7 +12,7 @@ Installation
 
 As usual, from [MELPA][] and [Marmalade][].
 
-In your [`Cask`][] file:
+In your [`Cask`][cask] file:
 
 ```cl
 (source gnu)
