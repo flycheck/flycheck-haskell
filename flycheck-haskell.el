@@ -34,6 +34,8 @@
 ;; file:
 ;;
 ;; - Add all source directories to the GHC search path
+;; - Add build directories from Cabal to the GHC search path to speed up
+;;   checking and support non-Haskell modules such as hsc files
 ;; - Add auto-generated files from Cabal to the GHC search path
 
 ;;;; Cabal sandboxes
