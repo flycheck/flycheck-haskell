@@ -79,9 +79,10 @@ scripts to extract information from Cabal files."
   (f-join (f-dirname (f-this-file)) "helpers")
   "Directory of helpers.")
 
-(defconst flycheck-haskell-get-source-directories
-  (f-join flycheck-haskell-helpers-directory "get-source-directories.hs")
-  "Helper to get source directories from a Cabal project.")
+(defun flycheck-haskell-helper-lines (helper &rest args)
+  "Get lines of output from HELPER with ARGS."
+  (let ((helper (f-join flycheck-haskell-helpers-directory helper)))
+    (apply #'process-lines flycheck-haskell-runhaskell helper args)))
 
 (defun flycheck-haskell-get-source-directories (cabal-file)
   "Get the source directories from a CABAL-FILE.
@@ -92,9 +93,8 @@ Return a list of source directories.  Signal an error if
 CABAL-FILE is not a valid project file, or if
 `flycheck-haskell-runhaskell' does not exist."
   (let ((cabal-dir (f-dirname cabal-file))
-        (source-files (process-lines flycheck-haskell-runhaskell
-                                     flycheck-haskell-get-source-directories
-                                     cabal-file)))
+        (source-files (flycheck-haskell-helper-lines "get-source-directories.hs"
+                                                     cabal-file)))
     ;; Expand all relative file names from the Cabal file
     (or (--map (f-join cabal-dir it) source-files)
         ;; Fall back to the root source directory
