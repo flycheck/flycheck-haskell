@@ -11,29 +11,20 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import Control.Monad (liftM,(>=>))
+import Data.Maybe (listToMaybe)
 import Distribution.Verbosity (silent)
-import Distribution.PackageDescription (PackageDescription
-                                       ,allBuildInfo
-                                       ,hsSourceDirs)
+import Distribution.PackageDescription (allBuildInfo,hsSourceDirs)
 import Distribution.PackageDescription.Configuration (flattenPackageDescription)
 import Distribution.PackageDescription.Parse (readPackageDescription)
 import System.Environment (getArgs)
 import System.Exit (exitFailure)
 
-
-collectSourceDirectories :: PackageDescription -> [FilePath]
-collectSourceDirectories = concatMap hsSourceDirs . allBuildInfo
-
-
 getSourceDirectories :: FilePath -> IO [FilePath]
 getSourceDirectories cabalFile = do
-  desc <- readPackageDescription silent cabalFile
-  return (collectSourceDirectories (flattenPackageDescription desc))
-
+  desc <- liftM flattenPackageDescription (readPackageDescription silent cabalFile)
+  return (concatMap hsSourceDirs (allBuildInfo desc))
 
 main :: IO ()
-main = do
-  args <- getArgs
-  case args of
-    [filename] -> getSourceDirectories filename >>= mapM_ putStrLn
-    _ -> exitFailure
+main = getArgs >>=
+       maybe exitFailure (getSourceDirectories >=> mapM_ putStrLn) . listToMaybe
