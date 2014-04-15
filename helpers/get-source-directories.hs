@@ -23,11 +23,13 @@ import Distribution.PackageDescription.Configuration (flattenPackageDescription)
 import Distribution.PackageDescription.Parse (readPackageDescription)
 import System.Environment (getArgs)
 import System.Exit (exitFailure)
+import System.FilePath ((</>),dropFileName)
 
 getSourceDirectories :: FilePath -> IO [FilePath]
 getSourceDirectories cabalFile = do
   desc <- liftM flattenPackageDescription (readPackageDescription silent cabalFile)
-  return (concatMap hsSourceDirs (allBuildInfo desc))
+  return (map (cabalDir </>) (concatMap hsSourceDirs (allBuildInfo desc)))
+  where cabalDir = dropFileName cabalFile
 
 main :: IO ()
 main = getArgs >>=

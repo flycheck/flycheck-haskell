@@ -92,13 +92,10 @@ CABAL-FILE is a string denoting a Cabal project file.
 Return a list of source directories.  Signal an error if
 CABAL-FILE is not a valid project file, or if
 `flycheck-haskell-runhaskell' does not exist."
-  (let ((cabal-dir (f-dirname cabal-file))
-        (source-files (flycheck-haskell-helper-lines "get-source-directories.hs"
+  (let ((source-dirs (flycheck-haskell-helper-lines "get-source-directories.hs"
                                                      cabal-file)))
-    ;; Expand all relative file names from the Cabal file
-    (or (--map (f-join cabal-dir it) source-files)
-        ;; Fall back to the root source directory
-        (list cabal-dir))))
+    ;; Fall back to the root source directory
+    (or source-dirs (list (f-parent cabal-file)))))
 
 (defconst flycheck-haskell-sandbox-config "cabal.sandbox.config"
   "The file name of a Cabal sandbox configuration.")
