@@ -1,8 +1,8 @@
 Changelog
 =========
 
-master (in development)
------------------------
+0.4 (Apr 25, 2014)
+------------------
 
 - Add build files from executables to GHC path
 - Add interactive `flycheck-haskell-configure` to explicitly re-configure
