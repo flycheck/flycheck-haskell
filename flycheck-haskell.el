@@ -97,6 +97,16 @@ CABAL-FILE is not a valid project file, or if
     ;; Fall back to the root source directory
     (or source-dirs (list (f-parent cabal-file)))))
 
+(defun flycheck-haskell-get-build-directories (cabal-file)
+  "Get the build directories for CABAL-FILE.
+
+CABAL-FILE is a string denoting a Cabal project file.
+
+Return a list of source directories.  Signal an error if
+CABAL-FILE is not a valid project file, or if
+`flycheck-haskell-runhaskell' does not exist."
+  (flycheck-haskell-helper-lines "get-build-directories.hs" cabal-file))
+
 (defconst flycheck-haskell-sandbox-config "cabal.sandbox.config"
   "The file name of a Cabal sandbox configuration.")
 
@@ -131,13 +141,11 @@ string, or nil, if no sandbox configuration file was found."
   "Set paths and package database for the current project."
   (when (buffer-file-name)
     (-when-let (cabal-file (haskell-cabal-find-file))
-      (let ((build-dir (expand-file-name "dist/build"
-                                         (file-name-directory cabal-file))))
-        (setq flycheck-ghc-search-path
-              (append (flycheck-haskell-get-source-directories cabal-file)
-                      ;; Auto-generated and compiled files from Cabal
-                      (list build-dir (expand-file-name "autogen" build-dir))
-                      flycheck-ghc-search-path))))
+      (setq flycheck-ghc-search-path
+            (append (flycheck-haskell-get-source-directories cabal-file)
+                    ;; Auto-generated and compiled files from Cabal
+                    (flycheck-haskell-get-build-directories cabal-file)
+                    flycheck-ghc-search-path)))
     (-when-let* ((config (flycheck-haskell-find-sandbox-config))
                  (package-db (flycheck-haskell-get-package-db config)))
       (push package-db flycheck-ghc-package-databases)

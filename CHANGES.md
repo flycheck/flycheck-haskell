@@ -4,6 +4,8 @@ Changelog
 master (in development)
 -----------------------
 
+- Add build files from executables to GHC path
+
 0.3 (Apr 14, 2014)
 ------------------
 
