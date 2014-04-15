@@ -5,6 +5,8 @@ master (in development)
 -----------------------
 
 - Add build files from executables to GHC path
+- Add interactive `flycheck-haskell-configure` to explicitly re-configure
+  Flycheck
 
 0.3 (Apr 14, 2014)
 ------------------

@@ -33,6 +33,10 @@ Usage
 
 Just use Flycheck as usual in your Cabal projects.
 
+To explicitly configure Haskell syntax checking for the current buffer, type
+<kbd>M-x flycheck-haskell-configure</kbd>.  You should run this command after
+major changes to the Cabal file.
+
 Customization
 -------------
 
