@@ -11,11 +11,6 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-{-# LANGUAGE OverloadedStrings #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
-
-module Flycheck.PrintCabal where
-
 import Distribution.Verbosity (silent)
 import Distribution.PackageDescription (PackageDescription
                                        ,allBuildInfo
