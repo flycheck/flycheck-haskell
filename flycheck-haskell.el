@@ -117,6 +117,16 @@ CABAL-FILE is not a valid project file, or if
 `flycheck-haskell-runhaskell' does not exist."
   (flycheck-haskell-helper-lines "get-extensions.hs" cabal-file))
 
+(defun flycheck-haskell-get-dependencies (cabal-file)
+  "Get the build dependencies from CABAL-FILE.
+
+CABAL-FILE is a string denoting a Cabal project file.
+
+Return a list of packages this Cabal project file depends on.
+Signal an error if CABAL-FILE is not a valid project file, or if
+`flycheck-haskell-runhaskell' does not exist."
+  (flycheck-haskell-helper-lines "get-dependencies.hs" cabal-file))
+
 (defconst flycheck-haskell-sandbox-config "cabal.sandbox.config"
   "The file name of a Cabal sandbox configuration.")
 
@@ -158,7 +168,9 @@ string, or nil, if no sandbox configuration file was found."
                     (flycheck-haskell-get-build-directories cabal-file)
                     flycheck-ghc-search-path)
             flycheck-ghc-extensions
-            (flycheck-haskell-get-extensions cabal-file)))
+            (flycheck-haskell-get-extensions cabal-file)
+            flycheck-ghc-packages
+            (flycheck-haskell-get-dependencies cabal-file)))
 
     (-when-let* ((config (flycheck-haskell-find-sandbox-config))
                  (package-db (flycheck-haskell-get-package-db config)))
