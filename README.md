@@ -1,6 +1,9 @@
 flycheck-haskell — Flycheck for Haskell
 =======================================
 
+[![License GPL 3][badge-license]][copying]
+[![Build Status][badge-travis]][travis]
+
 Configure [Flycheck][] for Haskell:
 
 - Add source directories from your cabal project to the search path
@@ -60,6 +63,10 @@ this program.  If not, see http://www.gnu.org/licenses/.
 
 See [`COPYING`][copying] for details.
 
+[badge-license]: https://img.shields.io/badge/license-GPL_3-green.svg?dummy
+[COPYING]: https://github.com/flycheck/flycheck-haskell/blob/master/COPYING
+[badge-travis]: https://travis-ci.org/flycheck/flycheck-haskell.svg?branch=master
+[travis]: https://travis-ci.org/flycheck/flycheck-haskell
 [Flycheck]: https://github.com/flycheck/flycheck
 [Cask]: https://github.com/cask/cask
 [MELPA]: http://melpa.milkbox.net
