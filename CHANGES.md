@@ -4,6 +4,8 @@ Changelog
 master (in development)
 -----------------------
 
+- #3: Extract language extensions from Cabal projects
+
 0.4 (Apr 25, 2014)
 ------------------
 

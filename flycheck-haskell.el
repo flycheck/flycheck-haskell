@@ -1,12 +1,13 @@
 ;;; flycheck-haskell.el --- Flycheck: Cabal projects and sandboxes -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2014 Sebastian Wiesner <lunaryorn@gmail.com>
+;; Copyright (C) 2014 Gracjan Polak <gracjanpolak@gmail.com>
 
 ;; Author: Sebastian Wiesner <lunaryorn@gmail.com>
 ;; URL: https://github.com/flycheck/flycheck-haskell
 ;; Keywords: tools, convenience
 ;; Version: 0.5-cvs
-;; Package-Requires: ((flycheck "0.16") (haskell-mode "13.7") (dash "2.4.0") (f "0.11.0"))
+;; Package-Requires: ((flycheck "0.19-cvs") (haskell-mode "13.7") (dash "2.4.0") (f "0.11.0"))
 
 ;; This file is not part of GNU Emacs.
 
@@ -37,6 +38,7 @@
 ;; - Add build directories from Cabal to the GHC search path to speed up
 ;;   checking and support non-Haskell modules such as hsc files
 ;; - Add auto-generated files from Cabal to the GHC search path
+;; - Enable language extensions from Cabal
 
 ;;;; Cabal sandboxes
 
@@ -107,6 +109,16 @@ CABAL-FILE is not a valid project file, or if
 `flycheck-haskell-runhaskell' does not exist."
   (flycheck-haskell-helper-lines "get-build-directories.hs" cabal-file))
 
+(defun flycheck-haskell-get-extensions (cabal-file)
+  "Get the language extensions for CABAL-FILE.
+
+CABAL-FILE is a string denoting a Cabal project file.
+
+Return a list of language extensions.  Signal an error if
+CABAL-FILE is not a valid project file, or if
+`flycheck-haskell-runhaskell' does not exist."
+  (flycheck-haskell-helper-lines "get-extensions.hs" cabal-file))
+
 (defconst flycheck-haskell-sandbox-config "cabal.sandbox.config"
   "The file name of a Cabal sandbox configuration.")
 
@@ -146,7 +158,10 @@ string, or nil, if no sandbox configuration file was found."
             (append (flycheck-haskell-get-source-directories cabal-file)
                     ;; Auto-generated and compiled files from Cabal
                     (flycheck-haskell-get-build-directories cabal-file)
-                    flycheck-ghc-search-path)))
+                    flycheck-ghc-search-path)
+            flycheck-ghc-extensions
+            (flycheck-haskell-get-extensions cabal-file)))
+
     (-when-let* ((config (flycheck-haskell-find-sandbox-config))
                  (package-db (flycheck-haskell-get-package-db config)))
       (push package-db flycheck-ghc-package-databases)
