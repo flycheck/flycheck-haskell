@@ -16,25 +16,33 @@
 -- this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import Control.Monad (liftM,(>=>))
+import Data.List (nub)
 import Data.Maybe (listToMaybe)
 import Distribution.Verbosity (silent)
-import Distribution.PackageDescription (allBuildInfo,allExtensions)
+import Distribution.PackageDescription (allBuildInfo,usedExtensions,allLanguages)
 import Distribution.PackageDescription.Configuration (flattenPackageDescription)
 import Distribution.PackageDescription.Parse (readPackageDescription)
-import Language.Haskell.Extension (Extension(..))
+import Language.Haskell.Extension (Extension(..),Language(..))
 import System.Environment (getArgs)
 import System.Exit (exitFailure)
+
+showLanguage :: Language -> String
+showLanguage Haskell98 = "Haskell98"
+showLanguage Haskell2010 = "Haskell2010"
+showLanguage (UnknownLanguage lang) = lang
 
 showExtension :: Extension -> String
 showExtension (EnableExtension ext) = show ext
 showExtension (DisableExtension ext) = "No" ++ show ext
 showExtension (UnknownExtension ext) = ext
 
-getExtensions :: FilePath -> IO [FilePath]
-getExtensions cabalFile = do
+getLanguagesAndExtensions :: FilePath -> IO [FilePath]
+getLanguagesAndExtensions cabalFile = do
   desc <- liftM flattenPackageDescription (readPackageDescription silent cabalFile)
-  return (map showExtension (concatMap allExtensions (allBuildInfo desc)))
+  let languages = map showLanguage (nub (concatMap allLanguages (allBuildInfo desc)))
+  let extensions = map showExtension (nub (concatMap usedExtensions (allBuildInfo desc)))
+  return (languages ++ extensions)
 
 main :: IO ()
 main = getArgs >>=
-       maybe exitFailure (getExtensions >=> mapM_ putStrLn) . listToMaybe
+       maybe exitFailure (getLanguagesAndExtensions >=> mapM_ putStrLn) . listToMaybe
