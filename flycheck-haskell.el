@@ -38,6 +38,7 @@
 ;; - Add build directories from Cabal to the GHC search path to speed up
 ;;   checking and support non-Haskell modules such as hsc files
 ;; - Add auto-generated files from Cabal to the GHC search path
+;; - Set the language from Cabal
 ;; - Enable language extensions from Cabal
 
 ;;;; Cabal sandboxes

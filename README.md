@@ -9,6 +9,7 @@ Configure [Flycheck][] for Haskell:
 - Add source directories from your cabal project to the search path
 - Add build files and auto-generated files from Cabal to the search path
 - Use package databases from the current Cabal sandbox
+- Set the language from Cabal
 - Enable language extensions from Cabal
 
 Installation

@@ -5,6 +5,7 @@ master (in development)
 -----------------------
 
 - #3: Extract language extensions from Cabal projects
+- #9: Set the language from Cabal
 
 0.4 (Apr 25, 2014)
 ------------------
