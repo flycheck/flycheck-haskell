@@ -15,7 +15,7 @@ Configure [Flycheck][] for Haskell:
 Installation
 ------------
 
-As usual, from [MELPA][] and [Marmalade][].
+As usual, from [MELPA][] or [MELPA Stable][].
 
 In your [`Cask`][cask] file:
 
@@ -71,5 +71,5 @@ See [`COPYING`][copying] for details.
 [Flycheck]: https://github.com/flycheck/flycheck
 [Cask]: https://github.com/cask/cask
 [MELPA]: http://melpa.milkbox.net
-[Marmalade]: http://marmalade-repo.org/
+[MELPA Stable]: http://melpa-stable.milkbox.net
 [COPYING]: https://github.com/flycheck/flycheck-haskell/blob/master/COPYING
