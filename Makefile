@@ -30,10 +30,13 @@ dist :
 deps : $(PKGDIR)
 
 # Cleanup targets
-clean : clean-elc clean-dist clean-deps
+clean : clean-elc clean-hs clean-dist clean-deps
 
 clean-elc :
 	rm -rf $(EL_OBJS)
+
+clean-hs:
+	rm -rf $(HS_OBJS) $(HS_BUILDDIR)
 
 clean-dist :
 	rm -rf $(DISTDIR)
