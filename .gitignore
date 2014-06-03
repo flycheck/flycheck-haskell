@@ -1,8 +1,7 @@
 *.elc
-*.hi
-*.o
 
 /get-cabal-configuration
 
 /.cask/
 /dist/
+/build/

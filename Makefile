@@ -8,6 +8,7 @@ PKGDIR := $(shell EMACS=$(EMACS) $(CASK) package-directory)
 # Export the used EMACS to recipe environments
 export EMACS
 
+HS_BUILDDIR = build/hs
 EL_SRCS = flycheck-haskell.el
 EL_OBJS = $(EL_SRCS:.el=.elc)
 HS_SRCS = get-cabal-configuration.hs
@@ -45,7 +46,7 @@ clean-deps :
 	$(CASK) exec $(EMACS) -Q --batch $(EMACSFLAGS) -f batch-byte-compile $<
 
 %: %.hs
-	$(GHC) $(GHCFLAGS) -o $@ $<
+	$(GHC) $(GHCFLAGS) -outputdir $(HS_BUILDDIR) -o $@ $<
 
 $(PKGDIR) : Cask
 	$(CASK) install
