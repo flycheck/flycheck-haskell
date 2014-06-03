@@ -82,43 +82,27 @@ scripts to extract information from Cabal files."
   (f-join (f-dirname (f-this-file)) "helpers")
   "Directory of helpers.")
 
-(defun flycheck-haskell-helper-lines (helper &rest args)
-  "Get lines of output from HELPER with ARGS."
-  (let ((helper (f-join flycheck-haskell-helpers-directory helper)))
-    (apply #'process-lines flycheck-haskell-runhaskell helper args)))
 
-(defun flycheck-haskell-get-source-directories (cabal-file)
-  "Get the source directories from a CABAL-FILE.
+(defun flycheck-haskell-get-cabal-configuration (cabal-file)
+  "Get information from CABAL-FILE.
 
 CABAL-FILE is a string denoting a Cabal project file.
 
-Return a list of source directories.  Signal an error if
-CABAL-FILE is not a valid project file, or if
+Returns an association list with keys 'source-directories,
+'build-directories, 'ghc-options, 'language-extensions and
+'dependencies that describe relevant information from Cabal
+project file.
+
+Signal an error if CABAL-FILE is not a valid project file, or if
 `flycheck-haskell-runhaskell' does not exist."
-  (let ((source-dirs (flycheck-haskell-helper-lines "get-source-directories.hs"
-                                                     cabal-file)))
-    ;; Fall back to the root source directory
-    (or source-dirs (list (f-parent cabal-file)))))
-
-(defun flycheck-haskell-get-build-directories (cabal-file)
-  "Get the build directories for CABAL-FILE.
-
-CABAL-FILE is a string denoting a Cabal project file.
-
-Return a list of source directories.  Signal an error if
-CABAL-FILE is not a valid project file, or if
-`flycheck-haskell-runhaskell' does not exist."
-  (flycheck-haskell-helper-lines "get-build-directories.hs" cabal-file))
-
-(defun flycheck-haskell-get-extensions (cabal-file)
-  "Get the language extensions for CABAL-FILE.
-
-CABAL-FILE is a string denoting a Cabal project file.
-
-Return a list of language extensions.  Signal an error if
-CABAL-FILE is not a valid project file, or if
-`flycheck-haskell-runhaskell' does not exist."
-  (flycheck-haskell-helper-lines "get-extensions.hs" cabal-file))
+  (let* ((helper-file-name "get-cabal-configuration.hs")
+         (helper (f-join flycheck-haskell-helpers-directory helper-file-name)))
+    (with-temp-buffer
+      (let ((status (apply 'call-process flycheck-haskell-runhaskell nil (current-buffer) nil (list helper cabal-file))))
+        (unless (eq status 0)
+          (error "%s exited with status %s" helper-file-name status))
+        (read (buffer-substring-no-properties
+               (point-min) (point-max)))))))
 
 (defconst flycheck-haskell-sandbox-config "cabal.sandbox.config"
   "The file name of a Cabal sandbox configuration.")
@@ -154,14 +138,20 @@ string, or nil, if no sandbox configuration file was found."
   "Set paths and package database for the current project."
   (interactive)
   (when (buffer-file-name)
-    (-when-let (cabal-file (haskell-cabal-find-file))
+    (-when-let* ((cabal-file (haskell-cabal-find-file))
+                 (cabal-options (flycheck-haskell-get-cabal-configuration cabal-file)))
       (setq flycheck-ghc-search-path
-            (append (flycheck-haskell-get-source-directories cabal-file)
+            (append (cdr (assoc 'source-directories cabal-options))
                     ;; Auto-generated and compiled files from Cabal
-                    (flycheck-haskell-get-build-directories cabal-file)
-                    flycheck-ghc-search-path)
-            flycheck-ghc-extensions
-            (flycheck-haskell-get-extensions cabal-file)))
+                    (cdr (assoc 'build-directories cabal-options))
+                    (default-value 'flycheck-ghc-search-path))
+            flycheck-ghc-language-extensions
+            (cdr (assoc 'language-extensions cabal-options))
+            flycheck-ghc-packages
+            (cdr (assoc 'dependencies cabal-options))
+            flycheck-ghc-options
+            (append (default-value 'flycheck-ghc-search-path)
+                    (cdr (assoc 'ghc-options cabal-options)))))
 
     (-when-let* ((config (flycheck-haskell-find-sandbox-config))
                  (package-db (flycheck-haskell-get-package-db config)))
