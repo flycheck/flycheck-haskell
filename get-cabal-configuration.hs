@@ -33,7 +33,7 @@ import Distribution.Verbosity (silent)
 import Language.Haskell.Extension (Extension(..),Language(..))
 import System.Environment (getArgs)
 import System.Exit (exitFailure)
-import System.FilePath ((</>),dropFileName)
+import System.FilePath ((</>),dropFileName,normalise)
 
 data Sexp = SList [Sexp]
           | SString String
@@ -91,8 +91,8 @@ dumpPackageDescription pkgDesc cabalFile = SList [
                        ]
   where cabalDir = dropFileName cabalFile
         buildInfo = allBuildInfo pkgDesc
-        buildDirs = getBuildDirectories pkgDesc cabalDir
-        sourceDirs = getSourceDirectories buildInfo cabalDir
+        buildDirs = map normalise (getBuildDirectories pkgDesc cabalDir)
+        sourceDirs = map normalise (getSourceDirectories buildInfo cabalDir)
         exts = nub (concatMap usedExtensions buildInfo)
         langs = nub (concatMap allLanguages buildInfo)
 
