@@ -78,47 +78,18 @@ scripts to extract information from Cabal files."
 
 
 ;;; Cabal support
-(defconst flycheck-haskell-helpers-directory
-  (f-join (f-dirname (f-this-file)) "helpers")
-  "Directory of helpers.")
+(defconst flycheck-haskell-helper
+  (f-join (f-dirname (f-this-file)) "get-cabal-configuration.hs")
+  "The helper to dump the Cabal configuration.")
 
-(defun flycheck-haskell-helper-lines (helper &rest args)
-  "Get lines of output from HELPER with ARGS."
-  (let ((helper (f-join flycheck-haskell-helpers-directory helper)))
-    (apply #'process-lines flycheck-haskell-runhaskell helper args)))
-
-(defun flycheck-haskell-get-source-directories (cabal-file)
-  "Get the source directories from a CABAL-FILE.
-
-CABAL-FILE is a string denoting a Cabal project file.
-
-Return a list of source directories.  Signal an error if
-CABAL-FILE is not a valid project file, or if
-`flycheck-haskell-runhaskell' does not exist."
-  (let ((source-dirs (flycheck-haskell-helper-lines "get-source-directories.hs"
-                                                     cabal-file)))
-    ;; Fall back to the root source directory
-    (or source-dirs (list (f-parent cabal-file)))))
-
-(defun flycheck-haskell-get-build-directories (cabal-file)
-  "Get the build directories for CABAL-FILE.
-
-CABAL-FILE is a string denoting a Cabal project file.
-
-Return a list of source directories.  Signal an error if
-CABAL-FILE is not a valid project file, or if
-`flycheck-haskell-runhaskell' does not exist."
-  (flycheck-haskell-helper-lines "get-build-directories.hs" cabal-file))
-
-(defun flycheck-haskell-get-extensions (cabal-file)
-  "Get the language extensions for CABAL-FILE.
-
-CABAL-FILE is a string denoting a Cabal project file.
-
-Return a list of language extensions.  Signal an error if
-CABAL-FILE is not a valid project file, or if
-`flycheck-haskell-runhaskell' does not exist."
-  (flycheck-haskell-helper-lines "get-extensions.hs" cabal-file))
+(defun flycheck-haskell-get-cabal-configuration (cabal-file)
+  "Get the Cabal configuration from CABAL-FILE."
+  (with-temp-buffer
+    (let ((result (call-process flycheck-haskell-runhaskell nil t nil
+                                flycheck-haskell-helper cabal-file)))
+      (when (= result 0)
+        (goto-char (point-min))
+        (read (current-buffer))))))
 
 (defconst flycheck-haskell-sandbox-config "cabal.sandbox.config"
   "The file name of a Cabal sandbox configuration.")
@@ -150,18 +121,30 @@ string, or nil, if no sandbox configuration file was found."
                                                flycheck-haskell-sandbox-config))
     (f-join root-dir flycheck-haskell-sandbox-config)))
 
+(defun flycheck-haskell-process-configuration (config)
+  "Process the a Cabal CONFIG."
+  (let (search-path language-extensions)
+    (dolist (item config)
+      ;; Accumulate the settings in local variables, to preserve the order as
+      ;; emitted by the helper, and because lexical vars are faster
+      (pcase item
+        (`(,(or `build-directories `source-directories) . ,dirs)
+         (setq search-path (append search-path dirs)))
+        (`(,(or `extensions `languages) . ,exts)
+         (setq language-extensions (append language-extensions exts)))))
+    ;; Prepend our dumped settings to any custom search path that is already set
+    (setq flycheck-ghc-search-path
+          (append search-path flycheck-ghc-search-path)
+          flycheck-ghc-language-extensions
+          (append language-extensions flycheck-ghc-language-extensions))))
+
 (defun flycheck-haskell-configure ()
   "Set paths and package database for the current project."
   (interactive)
   (when (buffer-file-name)
-    (-when-let (cabal-file (haskell-cabal-find-file))
-      (setq flycheck-ghc-search-path
-            (append (flycheck-haskell-get-source-directories cabal-file)
-                    ;; Auto-generated and compiled files from Cabal
-                    (flycheck-haskell-get-build-directories cabal-file)
-                    flycheck-ghc-search-path)
-            flycheck-ghc-extensions
-            (flycheck-haskell-get-extensions cabal-file)))
+    (-when-let* ((cabal-file (haskell-cabal-find-file))
+                 (config (flycheck-haskell-get-cabal-configuration cabal-file)))
+      (flycheck-haskell-process-configuration config))
 
     (-when-let* ((config (flycheck-haskell-find-sandbox-config))
                  (package-db (flycheck-haskell-get-package-db config)))
