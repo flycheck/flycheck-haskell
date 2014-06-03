@@ -4,3 +4,6 @@
 (package-file "flycheck-haskell.el")
 
 (files "*el" "*.hs")
+
+(development
+ (depends-on "ert-runner"))

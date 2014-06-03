@@ -17,6 +17,7 @@ HELPER_SRCS = helpers/get-source-directories.hs
 PACKAGE = flycheck-haskell-$(VERSION).tar
 
 .PHONY: compile dist \
+	test \
 	clean clean-elc clean-dist clean-deps \
 	deps
 
@@ -25,6 +26,10 @@ compile : $(EL_OBJS) $(HS_OBJS)
 
 dist :
 	$(CASK) package
+
+# Test targets
+test :
+	$(CASK) exec ert-runner
 
 # Support targets
 deps : $(PKGDIR)
