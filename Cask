@@ -3,4 +3,4 @@
 
 (package-file "flycheck-haskell.el")
 
-(files "*el" ("helpers" "helpers/*"))
+(files "*el" "*.hs")
