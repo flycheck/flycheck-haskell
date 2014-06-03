@@ -172,18 +172,22 @@ string, or nil, if no sandbox configuration file was found."
 
 (defun flycheck-haskell-process-configuration (config)
   "Process the a Cabal CONFIG."
-  (let (search-path language-extensions)
+  (let (search-path language-extensions packages)
     (dolist (item config)
       ;; Accumulate the settings in local variables, to preserve the order as
       ;; emitted by the helper, and because lexical vars are faster
       (pcase item
         (`(,(or `build-directories `source-directories) . ,dirs)
          (setq search-path (append search-path dirs)))
+        (`(,(or `dependencies) . ,deps)
+         (setq packages (append packages deps)))
         (`(,(or `extensions `languages) . ,exts)
          (setq language-extensions (append language-extensions exts)))))
     ;; Prepend our dumped settings to any custom search path that is already set
     (setq flycheck-ghc-search-path
           (append search-path flycheck-ghc-search-path)
+          flycheck-ghc-packages
+          (append packages flycheck-ghc-packages)
           flycheck-ghc-language-extensions
           (append language-extensions flycheck-ghc-language-extensions))))
 
