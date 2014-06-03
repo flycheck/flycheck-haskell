@@ -2,6 +2,8 @@ EMACS = emacs
 EMACSFLAGS =
 GHC = ghc
 GHCFLAGS = -Wall -Werror -O1
+HLINT = hlint
+HLINTFLAGS =
 CASK = cask
 PKGDIR := $(shell EMACS=$(EMACS) $(CASK) package-directory)
 
@@ -17,7 +19,7 @@ HELPER_SRCS = helpers/get-source-directories.hs
 PACKAGE = flycheck-haskell-$(VERSION).tar
 
 .PHONY: compile dist \
-	test \
+	lint test \
 	clean clean-elc clean-dist clean-deps \
 	deps
 
@@ -28,6 +30,9 @@ dist :
 	$(CASK) package
 
 # Test targets
+lint :
+	$(HLINT) $(HLINTFLAGS) $(HS_SRCS)
+
 test :
 	$(CASK) exec ert-runner
 

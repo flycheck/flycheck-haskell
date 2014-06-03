@@ -16,8 +16,11 @@ before_install:
   # Install and bootstrap cask
   - curl -fsSkL https://raw.github.com/cask/cask/master/go | python
   - export PATH="${HOME}/.cask/bin:$PATH"
+  # Install HLint to check our source
+  - cabal install hlint
 install:
   - cask install
 script:
   - make EMACS=emacs compile
+  - make HLINTFLAGS=-c lint
   - make EMACS=emacs test
