@@ -82,14 +82,63 @@ scripts to extract information from Cabal files."
   (f-join (f-dirname (f-this-file)) "get-cabal-configuration.hs")
   "The helper to dump the Cabal configuration.")
 
-(defun flycheck-haskell-get-cabal-configuration (cabal-file)
-  "Get the Cabal configuration from CABAL-FILE."
+(defconst flycheck-haskell-config-cache (make-hash-table :test 'equal)
+  "Cache of Cabal configuration.
+
+A hash table, mapping the name of a cabal file to a
+cons-cell `(MODTIME . CONFIG)', where MODTIME is the modification
+time of the cabal file, and CONFIG the extracted configuration.")
+
+(defun flycheck-haskell-clear-config-cache ()
+  "Clear the cache of configurations."
+  (interactive)
+  (clrhash flycheck-haskell-config-cache))
+
+(defun flycheck-haskell-get-cached-configuration (cabal-file)
+  "Get the cached configuration for CABAL-FILE.
+
+Return the cached configuration, or nil, if there is no cache
+entry, or if the cache entry is outdated."
+  (pcase-let* ((cache-entry (gethash cabal-file flycheck-haskell-config-cache))
+               (`(,modtime . ,config) cache-entry))
+    (when (and modtime (file-exists-p cabal-file))
+      (let ((current-modtime (nth 5 (file-attributes cabal-file))))
+        (if (time-less-p modtime current-modtime)
+            ;; The entry is outdated, drop it.  `remhash' always
+            ;; returns nil, so we are safe to use it here.
+            (remhash cabal-file flycheck-haskell-config-cache)
+          ;; The configuration is up to date, use it
+          config)))))
+
+(defun flycheck-haskell-read-cabal-configuration (cabal-file)
+  "Read the Cabal configuration from CABAL-FILE."
   (with-temp-buffer
     (let ((result (call-process flycheck-haskell-runhaskell nil t nil
                                 flycheck-haskell-helper cabal-file)))
       (when (= result 0)
         (goto-char (point-min))
         (read (current-buffer))))))
+
+(defun flycheck-haskell-read-and-cache-configuration (cabal-file)
+  "Read and cache configuration from CABAL-FILE.
+
+Return the configuration."
+  (let ((modtime (nth 5 (file-attributes cabal-file)))
+        (config (flycheck-haskell-read-cabal-configuration cabal-file)))
+    (puthash cabal-file (cons modtime config) flycheck-haskell-config-cache)
+    config))
+
+(defun flycheck-haskell-get-configuration (cabal-file)
+  "Get the Cabal configuration from CABAL-FILE.
+
+Get the configuration either from our cache, or by reading the
+CABAL-FILE.
+
+Return the configuration."
+  (let ((config (flycheck-haskell-get-cached-configuration cabal-file)))
+    (unless config
+      (setq config (flycheck-haskell-read-and-cache-configuration cabal-file)))
+    config))
 
 (defconst flycheck-haskell-sandbox-config "cabal.sandbox.config"
   "The file name of a Cabal sandbox configuration.")
@@ -143,7 +192,7 @@ string, or nil, if no sandbox configuration file was found."
   (interactive)
   (when (buffer-file-name)
     (-when-let* ((cabal-file (haskell-cabal-find-file))
-                 (config (flycheck-haskell-get-cabal-configuration cabal-file)))
+                 (config (flycheck-haskell-get-configuration cabal-file)))
       (flycheck-haskell-process-configuration config))
 
     (-when-let* ((config (flycheck-haskell-find-sandbox-config))
