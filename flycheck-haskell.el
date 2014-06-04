@@ -82,14 +82,34 @@ scripts to extract information from Cabal files."
   (f-join (f-dirname (f-this-file)) "get-cabal-configuration.hs")
   "The helper to dump the Cabal configuration.")
 
+(defvar flycheck-haskell-cabal-configuration-cache nil
+  "Caches results of 'flycheck-haskell-get-cabal-configuration.
+
+This is an association list mapping file name to a pair of
+cabal-file-modification-time and parse-cabal-configuration.")
+
 (defun flycheck-haskell-get-cabal-configuration (cabal-file)
   "Get the Cabal configuration from CABAL-FILE."
-  (with-temp-buffer
-    (let ((result (call-process flycheck-haskell-runhaskell nil t nil
-                                flycheck-haskell-helper cabal-file)))
-      (when (= result 0)
-        (goto-char (point-min))
-        (read (current-buffer))))))
+  (let* ((cabal-file-modification-time (nth 6 (file-attributes cabal-file)))
+         (cached-info (assoc-string cabal-file flycheck-haskell-cabal-configuration-cache))
+         (cached-file-modification-time (nth 1 cached-info))
+         (cached-cabal-configuration (nth 2 cached-info)))
+
+    (if (equal cached-file-modification-time cabal-file-modification-time)
+        cached-cabal-configuration
+
+      (with-temp-buffer
+        (let ((result (call-process flycheck-haskell-runhaskell nil t nil
+                                    flycheck-haskell-helper cabal-file)))
+          (when (= result 0)
+            (goto-char (point-min))
+            (let ((cabal-configuration (read (current-buffer))))
+              ;; Currently we treat cache as single slot. Should it be
+              ;; needed to improve remember to limit cache size in
+              ;; some other way.
+              (setq flycheck-haskell-cabal-configuration-cache
+                    (list (list cabal-file cabal-file-modification-time cabal-configuration)))
+              cabal-configuration)))))))
 
 (defconst flycheck-haskell-sandbox-config "cabal.sandbox.config"
   "The file name of a Cabal sandbox configuration.")
