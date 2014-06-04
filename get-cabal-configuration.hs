@@ -22,6 +22,7 @@
 import Control.Monad (liftM)
 import Data.List (nub)
 import Data.Maybe (listToMaybe)
+import Distribution.Package (PackageName(..),Dependency(..))
 import Distribution.PackageDescription (PackageDescription(..),allBuildInfo
                                        ,BuildInfo(..)
                                        ,usedExtensions,allLanguages
@@ -62,6 +63,9 @@ instance ToSexp Language where
   toSexp (UnknownLanguage lang) = toSexp lang
   toSexp lang = toSexp (show lang)
 
+instance ToSexp Dependency where
+  toSexp (Dependency (PackageName dependency) _) = toSexp dependency
+
 instance ToSexp Sexp where
   toSexp = id
 
@@ -88,6 +92,7 @@ dumpPackageDescription pkgDesc cabalFile = SList [
                        , cons (sym "source-directories") sourceDirs
                        , cons (sym "extensions") exts
                        , cons (sym "languages") langs
+                       , cons (sym "dependencies") deps
                        ]
   where cabalDir = dropFileName cabalFile
         buildInfo = allBuildInfo pkgDesc
@@ -95,6 +100,7 @@ dumpPackageDescription pkgDesc cabalFile = SList [
         sourceDirs = map normalise (getSourceDirectories buildInfo cabalDir)
         exts = nub (concatMap usedExtensions buildInfo)
         langs = nub (concatMap allLanguages buildInfo)
+        deps = nub (buildDepends pkgDesc)
 
 dumpCabalConfiguration :: String -> IO ()
 dumpCabalConfiguration cabalFile = do
