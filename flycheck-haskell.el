@@ -134,13 +134,10 @@ string, or nil, if no sandbox configuration file was found."
          (setq packages (append packages deps)))
         (`(,(or `extensions `languages) . ,exts)
          (setq language-extensions (append language-extensions exts)))))
-    ;; Prepend our dumped settings to any custom search path that is already set
-    (setq flycheck-ghc-search-path
-          (append search-path flycheck-ghc-search-path)
-          flycheck-ghc-packages
-          (append packages flycheck-ghc-packages)
-          flycheck-ghc-language-extensions
-          (append language-extensions flycheck-ghc-language-extensions))))
+    ;; Replace settings with values extracted from cabal file
+    (setq flycheck-ghc-search-path search-path
+          flycheck-ghc-packages packages
+          flycheck-ghc-language-extensions language-extensions)))
 
 (defun flycheck-haskell-configure ()
   "Set paths and package database for the current project."
@@ -152,7 +149,7 @@ string, or nil, if no sandbox configuration file was found."
 
     (-when-let* ((config (flycheck-haskell-find-sandbox-config))
                  (package-db (flycheck-haskell-get-package-db config)))
-      (push package-db flycheck-ghc-package-databases)
+      (setq flycheck-ghc-package-databases package-db)
       (setq flycheck-ghc-no-user-package-database t))))
 
 ;;;###autoload
