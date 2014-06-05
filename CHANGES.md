@@ -7,6 +7,7 @@ master (in development)
 - Extract language extensions from Cabal projects (GH-3)
 - Set the language from Cabal (GH-9)
 - Merge all helpers into a single one (GH-13)
+- Cache cabal configurations (GH-16, GH-18)
 
 0.4 (Apr 25, 2014)
 ------------------
