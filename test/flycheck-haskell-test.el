@@ -27,6 +27,7 @@
 
 (require 'flycheck-haskell)
 
+(require 'cl-lib)
 (require 'ert)
 (require 'f)
 
@@ -43,9 +44,15 @@
 
 ;;; Helpers
 
-(defun flycheck-haskell-test-config ()
-  "Get the Cabal configuration from the test file."
-  (flycheck-haskell-get-cabal-configuration flycheck-haskell-test-cabal-file))
+(defun flycheck-haskell-read-test-config ()
+  "Read the Cabal configuration from the test file."
+  (flycheck-haskell-read-cabal-configuration flycheck-haskell-test-cabal-file))
+
+(defmacro flycheck-haskell-test-with-cache (&rest body)
+  "Run BODY and clear the config cache afterwards."
+  (declare (indent 0))
+  `(unwind-protect (progn ,@body)
+     (flycheck-haskell-clear-config-cache)))
 
 
 ;;; Test cases
@@ -53,38 +60,101 @@
 (ert-deftest flycheck-haskell-runhaskell/default-value ()
   (should (string= flycheck-haskell-runhaskell "runhaskell")))
 
-(ert-deftest flycheck-haskell-get-cabal-configuration/has-all-extensions ()
-  (should (equal (assq 'extensions (flycheck-haskell-test-config))
+(ert-deftest flycheck-haskell-clear-config-cache ()
+  (unwind-protect
+      (progn
+        (puthash "foo" "bar" flycheck-haskell-config-cache)
+        (should (= (hash-table-count flycheck-haskell-config-cache) 1))
+        (flycheck-haskell-clear-config-cache)
+        (should (= (hash-table-count flycheck-haskell-config-cache) 0)))
+    (clrhash flycheck-haskell-config-cache)))
+
+(ert-deftest flycheck-haskell-get-cached-configuration/no-cache-entry ()
+  (should-not (flycheck-haskell-get-cached-configuration
+               flycheck-haskell-test-cabal-file)))
+
+(ert-deftest flycheck-haskell-get-cached-configuration/cached-config ()
+  (flycheck-haskell-test-with-cache
+    (flycheck-haskell-read-and-cache-configuration
+     flycheck-haskell-test-cabal-file)
+    (should (= (hash-table-count flycheck-haskell-config-cache) 1))
+    (let ((config (flycheck-haskell-get-cached-configuration
+                   flycheck-haskell-test-cabal-file)))
+      (should (equal config
+                     (flycheck-haskell-read-cabal-configuration
+                      flycheck-haskell-test-cabal-file))))))
+
+(ert-deftest flycheck-haskell-get-cached-configuration/file-is-modified ()
+  (flycheck-haskell-test-with-cache
+    (flycheck-haskell-read-and-cache-configuration
+     flycheck-haskell-test-cabal-file)
+    (should (flycheck-haskell-get-cached-configuration
+             flycheck-haskell-test-cabal-file))
+    ;; Wait a second, to ensure that the current time advances
+    (sleep-for 1)
+    (set-file-times flycheck-haskell-test-cabal-file)
+    (should-not (flycheck-haskell-get-cached-configuration
+                 flycheck-haskell-test-cabal-file))
+    (should (= (hash-table-count flycheck-haskell-config-cache) 0))))
+
+(ert-deftest flycheck-haskell-read-cabal-configuration/has-all-extensions ()
+  (should (equal (assq 'extensions (flycheck-haskell-read-test-config))
                  '(extensions "OverloadedStrings"
                               "YouDontKnowThisOne"
                               "GeneralizedNewtypeDeriving"))))
 
-
-(ert-deftest flycheck-haskell-get-cabal-configuration/has-all-languages ()
-  (should (equal (assq 'languages (flycheck-haskell-test-config))
+(ert-deftest flycheck-haskell-read-cabal-configuration/has-all-languages ()
+  (should (equal (assq 'languages (flycheck-haskell-read-test-config))
                  '(languages "Haskell98" "SpamLanguage" "Haskell2010"))))
 
-(ert-deftest flycheck-haskell-get-cabal-configuration/source-dirs ()
+(ert-deftest flycheck-haskell-read-cabal-configuration/source-dirs ()
   (let* ((builddirs '("lib/" "." "src/"))
          (expanddir (lambda (fn) (file-name-as-directory
                                   (f-join flycheck-haskell-test-dir fn)))))
     (should (equal
-             (assq 'source-directories (flycheck-haskell-test-config))
+             (assq 'source-directories (flycheck-haskell-read-test-config))
              (cons 'source-directories (-map expanddir builddirs))))))
 
-(ert-deftest flycheck-haskell-get-cabal-configuration/build-dirs ()
+(ert-deftest flycheck-haskell-read-cabal-configuration/build-dirs ()
   (let* ((distdir (f-join flycheck-haskell-test-dir "dist/"))
          (expanddir (apply-partially #'f-join distdir))
          (builddirs '("build" "build/autogen"
                  "build/flycheck-haskell-unknown-stuff/flycheck-haskell-unknown-stuff-tmp"
                  "build/flycheck-haskell-test/flycheck-haskell-test-tmp")))
     (should (equal
-             (assq 'build-directories (flycheck-haskell-test-config))
+             (assq 'build-directories (flycheck-haskell-read-test-config))
              (cons 'build-directories (-map expanddir builddirs))))))
+
+(ert-deftest flycheck-haskell-get-configuration/no-cache-entry ()
+  (let* ((cabal-file flycheck-haskell-test-cabal-file))
+    (cl-letf (((symbol-function 'flycheck-haskell-read-cabal-configuration)
+               (lambda (_) 'dummy)))
+      (flycheck-haskell-test-with-cache
+        (should-not (flycheck-haskell-get-cached-configuration cabal-file))
+        (should (eq (flycheck-haskell-get-configuration cabal-file) 'dummy))
+        (should (eq (flycheck-haskell-get-cached-configuration cabal-file)
+                    'dummy))))))
+
+(ert-deftest flycheck-haskell-get-configuration/has-cache-entry ()
+  (let* ((cabal-file flycheck-haskell-test-cabal-file)
+         (mtime (nth 6 (file-attributes cabal-file))))
+    (cl-letf (((symbol-function 'flycheck-haskell-read-cabal-configuration)
+               (lambda (_) 'dummy)))
+      (flycheck-haskell-test-with-cache
+        ;; Create a fake hash entry, which is guaranteed to be newer than the
+        ;; actual file
+        (puthash cabal-file (cons (time-add mtime (seconds-to-time 1))
+                                  'cached-dummy)
+                 flycheck-haskell-config-cache)
+        (should (eq (flycheck-haskell-get-configuration cabal-file)
+                    'cached-dummy))
+        (flycheck-haskell-clear-config-cache)
+        (should (eq (flycheck-haskell-get-configuration cabal-file)
+                    'dummy))))))
 
 (ert-deftest flycheck-haskell-process-configuration/language-extensions ()
   (with-temp-buffer                     ; To scope the variables
-    (flycheck-haskell-process-configuration (flycheck-haskell-test-config))
+    (flycheck-haskell-process-configuration (flycheck-haskell-read-test-config))
     (should (equal flycheck-ghc-language-extensions
                    '("OverloadedStrings"
                      "YouDontKnowThisOne"
@@ -103,7 +173,7 @@
                                   (f-join flycheck-haskell-test-dir fn))))
          (sourcedirs '("lib/" "." "src/")))
     (with-temp-buffer
-      (flycheck-haskell-process-configuration (flycheck-haskell-test-config))
+      (flycheck-haskell-process-configuration (flycheck-haskell-read-test-config))
       (should (equal flycheck-ghc-search-path
                      (append (-map builddir builddirs)
                              (-map sourcedir sourcedirs)))))))
