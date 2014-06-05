@@ -135,10 +135,8 @@ Get the configuration either from our cache, or by reading the
 CABAL-FILE.
 
 Return the configuration."
-  (let ((config (flycheck-haskell-get-cached-configuration cabal-file)))
-    (unless config
-      (setq config (flycheck-haskell-read-and-cache-configuration cabal-file)))
-    config))
+  (or (flycheck-haskell-get-cached-configuration cabal-file)
+      (flycheck-haskell-read-and-cache-configuration cabal-file)))
 
 (defconst flycheck-haskell-sandbox-config "cabal.sandbox.config"
   "The file name of a Cabal sandbox configuration.")
