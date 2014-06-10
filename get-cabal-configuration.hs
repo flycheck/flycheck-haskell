@@ -1,4 +1,4 @@
--- Copyright (C) 2014 Sebastian Wiesner <lunaryorn@gmail.com>
+-- Copyright (C) 2014 Sebastian Wiesner <swiesner@lunaryorn.com>
 -- Copyright (C) 2014 Gracjan Polak <gracjanpolak@gmail.com>
 
 -- This file is not part of GNU Emacs.

@@ -1,8 +1,8 @@
 ;;; flycheck-haskell-test.el --- Flycheck Haskell: Test suite  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2014  Sebastian Wiesner
+;; Copyright (C) 2014  Sebastian Wiesner <swiesner@lunaryorn.com>
 
-;; Author: Sebastian Wiesner <lunaryorn@gmail.com>
+;; Author: Sebastian Wiesner <swiesner@lunaryorn.com>
 
 ;; This file is not part of GNU Emacs.
 
