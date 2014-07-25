@@ -7,7 +7,7 @@
 ;; URL: https://github.com/flycheck/flycheck-haskell
 ;; Keywords: tools, convenience
 ;; Version: 0.5-cvs
-;; Package-Requires: ((flycheck "0.19-cvs") (haskell-mode "13.7") (dash "2.4.0") (f "0.11.0"))
+;; Package-Requires: ((flycheck "0.19-cvs") (haskell-mode "13.7") (dash "2.4.0"))
 
 ;; This file is not part of GNU Emacs.
 
@@ -55,7 +55,6 @@
 
 (require 'haskell-cabal)
 (require 'flycheck)
-(require 'f)
 (require 'dash)
 (require 'rx)
 
@@ -79,7 +78,10 @@ scripts to extract information from Cabal files."
 
 ;;; Cabal support
 (defconst flycheck-haskell-helper
-  (f-join (f-dirname (f-this-file)) "get-cabal-configuration.hs")
+  (expand-file-name "get-cabal-configuration.hs"
+                    (file-name-directory (if load-in-progress
+                                             load-file-name
+                                           (buffer-file-name))))
   "The helper to dump the Cabal configuration.")
 
 (defconst flycheck-haskell-config-cache (make-hash-table :test 'equal)
@@ -166,7 +168,7 @@ Return the absolute path of the sandbox configuration file as
 string, or nil, if no sandbox configuration file was found."
   (-when-let (root-dir (locate-dominating-file (buffer-file-name)
                                                flycheck-haskell-sandbox-config))
-    (f-join root-dir flycheck-haskell-sandbox-config)))
+    (expand-file-name flycheck-haskell-sandbox-config root-dir)))
 
 (defun flycheck-haskell-process-configuration (config)
   "Process the a Cabal CONFIG."
