@@ -72,4 +72,3 @@ See [`COPYING`][copying] for details.
 [Cask]: https://github.com/cask/cask
 [MELPA]: http://melpa.milkbox.net
 [MELPA Stable]: http://melpa-stable.milkbox.net
-[COPYING]: https://github.com/flycheck/flycheck-haskell/blob/master/COPYING
