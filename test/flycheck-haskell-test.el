@@ -29,16 +29,16 @@
 
 (require 'cl-lib)
 (require 'ert)
-(require 'f)
 
 
 ;;; Directories
 
-(defconst flycheck-haskell-test-dir (f-parent (f-this-file))
+(defconst flycheck-haskell-test-dir
+  (file-name-directory (if load-in-progress load-file-name (buffer-file-name)))
   "Directory of the test suite.")
 
 (defconst flycheck-haskell-test-cabal-file
-  (f-join flycheck-haskell-test-dir "flycheck-haskell-test.cabal")
+  (expand-file-name "flycheck-haskell-test.cabal" flycheck-haskell-test-dir)
   "Cabal file for our test suite.")
 
 
@@ -109,15 +109,16 @@
 
 (ert-deftest flycheck-haskell-read-cabal-configuration/source-dirs ()
   (let* ((builddirs '("lib/" "." "src/"))
-         (expanddir (lambda (fn) (file-name-as-directory
-                                  (f-join flycheck-haskell-test-dir fn)))))
+         (expanddir (lambda (fn)
+                      (file-name-as-directory
+                       (expand-file-name fn flycheck-haskell-test-dir)))))
     (should (equal
              (assq 'source-directories (flycheck-haskell-read-test-config))
              (cons 'source-directories (-map expanddir builddirs))))))
 
 (ert-deftest flycheck-haskell-read-cabal-configuration/build-dirs ()
-  (let* ((distdir (f-join flycheck-haskell-test-dir "dist/"))
-         (expanddir (apply-partially #'f-join distdir))
+  (let* ((distdir (expand-file-name "dist/" flycheck-haskell-test-dir))
+         (expanddir (lambda (fn) (expand-file-name fn distdir)))
          (builddirs '("build" "build/autogen"
                  "build/flycheck-haskell-unknown-stuff/flycheck-haskell-unknown-stuff-tmp"
                  "build/flycheck-haskell-test/flycheck-haskell-test-tmp")))
@@ -164,13 +165,13 @@
                      "Haskell2010")))))
 
 (ert-deftest flycheck-haskell-process-configuration/search-path ()
-  (let* ((distdir (f-join flycheck-haskell-test-dir "dist/"))
-         (builddir (apply-partially #'f-join distdir))
+  (let* ((distdir (expand-file-name "dist/" flycheck-haskell-test-dir))
+         (builddir (lambda (fn) (expand-file-name fn distdir)))
          (builddirs '("build" "build/autogen"
                       "build/flycheck-haskell-unknown-stuff/flycheck-haskell-unknown-stuff-tmp"
                       "build/flycheck-haskell-test/flycheck-haskell-test-tmp"))
          (sourcedir (lambda (fn) (file-name-as-directory
-                                  (f-join flycheck-haskell-test-dir fn))))
+                                  (expand-file-name fn flycheck-haskell-test-dir))))
          (sourcedirs '("lib/" "." "src/")))
     (with-temp-buffer
       (flycheck-haskell-process-configuration (flycheck-haskell-read-test-config))
