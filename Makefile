@@ -18,6 +18,8 @@ HS_OBJS = $(HS_SRCS:.hs=)
 HELPER_SRCS = helpers/get-source-directories.hs
 PACKAGE = flycheck-haskell-$(VERSION).tar
 
+EMACSBATCH = $(EMACS) -Q --batch $(EMACSFLAGS)
+
 .PHONY: compile dist \
 	lint test \
 	clean clean-elc clean-dist clean-deps \
@@ -33,8 +35,9 @@ dist :
 lint :
 	$(HLINT) $(HLINTFLAGS) $(HS_SRCS)
 
-test :
-	$(CASK) exec ert-runner
+test : $(EL_OBJS)
+	$(CASK) exec $(EMACSBATCH) -l flycheck-haskell.elc \
+		-l test/flycheck-haskell-test.el -f ert-run-tests-batch-and-exit
 
 # Support targets
 deps : $(PKGDIR)
@@ -56,7 +59,7 @@ clean-deps :
 
 # File targets
 %.elc : %.el $(PKGDIR)
-	$(CASK) exec $(EMACS) -Q --batch $(EMACSFLAGS) -f batch-byte-compile $<
+	$(CASK) exec $(EMACSBATCH) -f batch-byte-compile $<
 
 %: %.hs
 	$(GHC) $(GHCFLAGS) -outputdir $(HS_BUILDDIR) -o $@ $<

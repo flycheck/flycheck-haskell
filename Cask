@@ -6,5 +6,4 @@
 (files "*el" "*.hs")
 
 (development
- (depends-on "ert-runner")
  (depends-on "cl-lib"))
