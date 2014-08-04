@@ -22,6 +22,6 @@ before_install:
 install:
   - cask install
 script:
-  - make EMACS=emacs compile
+  - make EMACS=$EMACS compile
   - make HLINTFLAGS=-c lint
-  - make EMACS=emacs test
+  - make EMACS=$EMACS test
