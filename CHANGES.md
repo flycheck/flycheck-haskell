@@ -1,8 +1,8 @@
 Changelog
 =========
 
-master (in development)
------------------------
+0.5 (Oct 3, 2014)
+-----------------
 
 - Extract language extensions from Cabal projects [GH-3]
 - Set the language from Cabal [GH-9]
@@ -11,7 +11,7 @@ master (in development)
 
 0.4 (Apr 25, 2014)
 ------------------
-
+cc
 - Add build files from executables to GHC path
 - Add interactive `flycheck-haskell-configure` to explicitly re-configure
   Flycheck
