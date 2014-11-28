@@ -71,7 +71,7 @@ See [`COPYING`][copying] for details.
 [badge-melpa]: http://melpa.org/packages/flycheck-haskell-badge.svg
 [badge-melpa-stable]: http://stable.melpa.org/packages/flycheck-haskell-badge.svg
 [badge-travis]: https://travis-ci.org/flycheck/flycheck-haskell.svg?branch=master
-[Flycheck]: https://github.com/flycheck/flycheck
+[Flycheck]: https://www.flycheck.org
 [Cask]: https://github.com/cask/cask
-[MELPA]: http://melpa.milkbox.net
-[MELPA Stable]: http://melpa-stable.milkbox.net
+[MELPA]: http://melpa.org
+[MELPA Stable]: http://stable.melpa.org
