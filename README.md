@@ -2,7 +2,9 @@ flycheck-haskell — Flycheck for Haskell
 =======================================
 
 [![License GPL 3][badge-license]][copying]
-[![Build Status][badge-travis]][travis]
+[![MELPA][badge-melpa]](http://melpa.org/#/flycheck-haskell)
+[![MELPA Stable][badge-melpa-stable]](http://stable.melpa.org/#/flycheck-haskell)
+[![Build Status][badge-travis]](https://travis-ci.org/flycheck/flycheck-haskell)
 
 Configure [Flycheck][] for Haskell:
 
@@ -66,8 +68,9 @@ See [`COPYING`][copying] for details.
 
 [badge-license]: https://img.shields.io/badge/license-GPL_3-green.svg?dummy
 [COPYING]: https://github.com/flycheck/flycheck-haskell/blob/master/COPYING
+[badge-melpa]: http://melpa.org/packages/flycheck-haskell-badge.svg
+[badge-melpa-stable]: http://stable.melpa.org/packages/flycheck-haskell-badge.svg
 [badge-travis]: https://travis-ci.org/flycheck/flycheck-haskell.svg?branch=master
-[travis]: https://travis-ci.org/flycheck/flycheck-haskell
 [Flycheck]: https://github.com/flycheck/flycheck
 [Cask]: https://github.com/cask/cask
 [MELPA]: http://melpa.milkbox.net
