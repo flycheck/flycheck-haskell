@@ -162,7 +162,8 @@
                      "GeneralizedNewtypeDeriving"
                      "Haskell98"
                      "SpamLanguage"
-                     "Haskell2010")))))
+                     "Haskell2010")))
+    (should (local-variable-p 'flycheck-ghc-language-extensions))))
 
 (ert-deftest flycheck-haskell-process-configuration/search-path ()
   (let* ((distdir (expand-file-name "dist/" flycheck-haskell-test-dir))
@@ -177,7 +178,8 @@
       (flycheck-haskell-process-configuration (flycheck-haskell-read-test-config))
       (should (equal flycheck-ghc-search-path
                      (append (-map builddir builddirs)
-                             (-map sourcedir sourcedirs)))))))
+                             (-map sourcedir sourcedirs))))
+      (should (local-variable-p 'flycheck-ghc-search-path)))))
 
 (provide 'flycheck-haskell-test)
 

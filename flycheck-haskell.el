@@ -176,11 +176,12 @@ string, or nil, if no sandbox configuration file was found."
 (defun flycheck-haskell-process-configuration (config)
   "Process the a Cabal CONFIG."
   (let-alist config
-    (setq flycheck-ghc-search-path
-          (append .build-directories .source-directories
-                  flycheck-ghc-search-path))
-    (setq flycheck-ghc-language-extensions
-          (append .extensions .languages flycheck-ghc-language-extensions))))
+    (setq-local flycheck-ghc-search-path
+                (append .build-directories .source-directories
+                        flycheck-ghc-search-path))
+    (setq-local flycheck-ghc-language-extensions
+                (append .extensions .languages
+                        flycheck-ghc-language-extensions))))
 
 (defun flycheck-haskell-configure ()
   "Set paths and package database for the current project."
@@ -192,8 +193,9 @@ string, or nil, if no sandbox configuration file was found."
 
     (-when-let* ((config (flycheck-haskell-find-sandbox-config))
                  (package-db (flycheck-haskell-get-package-db config)))
-      (push package-db flycheck-ghc-package-databases)
-      (setq flycheck-ghc-no-user-package-database t))))
+      (setq-local flycheck-ghc-package-databases
+                  (cons package-db flycheck-ghc-package-databases))
+      (setq-local flycheck-ghc-no-user-package-database t))))
 
 ;;;###autoload
 (defun flycheck-haskell-setup ()
