@@ -1,8 +1,10 @@
 Changelog
 =========
 
-master
-------
+0.5.1 (Dec 27, 2014)
+--------------------
+
+- Explicitly set local values of variables
 
 0.5 (Oct 3, 2014)
 -----------------
