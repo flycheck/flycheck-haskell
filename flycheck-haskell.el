@@ -53,10 +53,12 @@
 
 ;;; Code:
 
+(eval-when-compile
+  (require 'rx))
+
 (require 'haskell-cabal)
 (require 'flycheck)
 (require 'dash)
-(require 'rx)
 
 
 ;;; Customization
