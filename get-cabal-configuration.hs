@@ -20,11 +20,14 @@
 {-# LANGUAGE FlexibleInstances #-}
 
 import Control.Monad (liftM)
-import Data.List (nub)
+import Data.List (nub, isPrefixOf)
 import Data.Maybe (listToMaybe)
+import Distribution.Compiler (CompilerFlavor(GHC))
+import Distribution.Package (PackageName(..),Dependency(..))
 import Distribution.PackageDescription (PackageDescription(..),allBuildInfo
                                        ,BuildInfo(..)
                                        ,usedExtensions,allLanguages
+                                       ,hcOptions
                                        ,exeName)
 import Distribution.PackageDescription.Configuration (flattenPackageDescription)
 import Distribution.PackageDescription.Parse (readPackageDescription)
@@ -62,6 +65,9 @@ instance ToSexp Language where
   toSexp (UnknownLanguage lang) = toSexp lang
   toSexp lang = toSexp (show lang)
 
+instance ToSexp Dependency where
+  toSexp (Dependency (PackageName dependency) _) = toSexp dependency
+
 instance ToSexp Sexp where
   toSexp = id
 
@@ -82,19 +88,32 @@ getSourceDirectories :: [BuildInfo] -> FilePath -> [String]
 getSourceDirectories buildInfo cabalDir =
   map (cabalDir </>) (concatMap hsSourceDirs buildInfo)
 
+usefulOptions :: [String]
+usefulOptions = ["-W", "-w", "-Wall", "-fglasgow-exts", "-fpackage-trust", "-fhelpful-errors", "-F", "-cpp"]
+
+usefulOptionPrefixes :: [String]
+usefulOptionPrefixes = ["-fwarn-", "-fno-warn-", "-fcontext-stack=", "-firrefutable-tuples", "-D", "-U", "-I", "-fplugin=", "-fplugin-opt=", "-pgm", "-opt"]
+
+isFlycheckUsefulOption :: String -> Bool
+isFlycheckUsefulOption opt = elem opt usefulOptions || any (`isPrefixOf` opt) usefulOptionPrefixes
+
 dumpPackageDescription :: PackageDescription -> FilePath -> Sexp
 dumpPackageDescription pkgDesc cabalFile = SList [
                          cons (sym "build-directories") buildDirs
                        , cons (sym "source-directories") sourceDirs
                        , cons (sym "extensions") exts
                        , cons (sym "languages") langs
+                       , cons (sym "dependencies") deps
+                       , cons (sym "other-options") otherOptions
                        ]
   where cabalDir = dropFileName cabalFile
         buildInfo = allBuildInfo pkgDesc
-        buildDirs = map normalise (getBuildDirectories pkgDesc cabalDir)
-        sourceDirs = map normalise (getSourceDirectories buildInfo cabalDir)
+        buildDirs = nub (map normalise (getBuildDirectories pkgDesc cabalDir))
+        sourceDirs = nub (map normalise (getSourceDirectories buildInfo cabalDir))
         exts = nub (concatMap usedExtensions buildInfo)
         langs = nub (concatMap allLanguages buildInfo)
+        deps = nub (buildDepends pkgDesc)
+        otherOptions = nub (filter isFlycheckUsefulOption (concatMap (hcOptions GHC) buildInfo))
 
 dumpCabalConfiguration :: String -> IO ()
 dumpCabalConfiguration cabalFile = do
