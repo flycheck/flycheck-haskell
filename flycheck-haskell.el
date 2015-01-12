@@ -186,7 +186,7 @@ string, or nil, if no sandbox configuration file was found."
 (defun flycheck-haskell-configure ()
   "Set paths and package database for the current project."
   (interactive)
-  (when (buffer-file-name)
+  (when (and (buffer-file-name) (file-directory-p default-directory))
     (-when-let* ((cabal-file (haskell-cabal-find-file))
                  (config (flycheck-haskell-get-configuration cabal-file)))
       (flycheck-haskell-process-configuration config))

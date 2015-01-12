@@ -1,6 +1,8 @@
 master (in development)
 =======================
 
+- Fix error when `default-directory` does not exist
+
 0.5.1 (Dec 27, 2014)
 ====================
 
