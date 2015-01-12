@@ -1,6 +1,6 @@
 ;;; flycheck-haskell.el --- Flycheck: Cabal projects and sandboxes -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2014 Sebastian Wiesner <swiesner@lunaryorn.com>
+;; Copyright (C) 2014, 2015 Sebastian Wiesner <swiesner@lunaryorn.com>
 ;; Copyright (C) 2014 Gracjan Polak <gracjanpolak@gmail.com>
 
 ;; Author: Sebastian Wiesner <swiesner@lunaryorn.com>
