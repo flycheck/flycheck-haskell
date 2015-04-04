@@ -1,5 +1,5 @@
-master (in development)
-=======================
+0.6 (Apr 04, 2015)
+==================
 
 - Fix error when `default-directory` does not exist
 - Extract various additional GHC options [GH-25] [GH-26]
