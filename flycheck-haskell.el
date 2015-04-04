@@ -143,6 +143,9 @@ Return the configuration."
   (or (flycheck-haskell-get-cached-configuration cabal-file)
       (flycheck-haskell-read-and-cache-configuration cabal-file)))
 
+(defconst flycheck-haskell-cabal-config "cabal.config"
+  "The file name of a Cabal configuration.")
+
 (defconst flycheck-haskell-sandbox-config "cabal.sandbox.config"
   "The file name of a Cabal sandbox configuration.")
 
@@ -163,6 +166,33 @@ database was not found."
     (goto-char (point-min))
     (when (re-search-forward flycheck-haskell-package-db-re nil 'noerror)
       (match-string 1))))
+
+(defconst flycheck-haskell-compiler-re
+  (rx line-start (zero-or-more (any space)) "with-compiler:"
+      (zero-or-more (any space))
+      (group (one-or-more (not (any space))))
+      (zero-or-more (any space) line-end))
+  "Regular expression to parse the compiler path.")
+
+(defun flycheck-haskell-get-compiler (cabal-config)
+  "Get the compiler path from CABAL-CONFIG.
+
+Return the compiler path as string, or nil, if the database was
+not found."
+  (with-temp-buffer
+    (insert-file-contents cabal-config)
+    (goto-char (point-min))
+    (when (re-search-forward flycheck-haskell-compiler-re nil 'noerror)
+      (match-string 1))))
+
+(defun flycheck-haskell-find-cabal-config ()
+  "Find Cabal configuration for the current buffer.
+
+Return the absolute path of the configuration file as
+string, or nil, if no sandbox configuration file was found."
+  (-when-let (root-dir (locate-dominating-file (buffer-file-name)
+                                               flycheck-haskell-cabal-config))
+    (expand-file-name flycheck-haskell-sandbox-config root-dir)))
 
 (defun flycheck-haskell-find-sandbox-config ()
   "Find Cabal sandbox configuration for the current buffer.
@@ -195,6 +225,10 @@ string, or nil, if no sandbox configuration file was found."
     (-when-let* ((cabal-file (haskell-cabal-find-file))
                  (config (flycheck-haskell-get-configuration cabal-file)))
       (flycheck-haskell-process-configuration config))
+
+    (-when-let* ((config (flycheck-haskell-find-cabal-config))
+                 (compiler (flycheck-haskell-get-compiler config)))
+      (setq-local flycheck-haskell-ghc-executable compiler))
 
     (-when-let* ((config (flycheck-haskell-find-sandbox-config))
                  (package-db (flycheck-haskell-get-package-db config)))
