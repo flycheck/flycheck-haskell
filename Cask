@@ -3,7 +3,9 @@
 
 (package-file "flycheck-haskell.el")
 
-(files "*el" "*.hs")
+(files
+ "flycheck-haskell.el"
+ "get-cabal-configuration.hs")
 
 (development
  (depends-on "cl-lib"))
