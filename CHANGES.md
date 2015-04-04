@@ -2,6 +2,8 @@ master (in development)
 =======================
 
 - Fix error when `default-directory` does not exist
+- Extract various additional GHC options [GH-25] [GH-26]
+- Extract dependencies to avoid package conflicts [GH-25] [GH-26]
 
 0.5.1 (Dec 27, 2014)
 ====================
