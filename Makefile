@@ -15,7 +15,6 @@ EL_SRCS = flycheck-haskell.el
 EL_OBJS = $(EL_SRCS:.el=.elc)
 HS_SRCS = get-cabal-configuration.hs
 HS_OBJS = $(HS_SRCS:.hs=)
-HELPER_SRCS = helpers/get-source-directories.hs
 PACKAGE = flycheck-haskell-$(VERSION).tar
 
 EMACSBATCH = $(EMACS) -Q --batch $(EMACSFLAGS)
