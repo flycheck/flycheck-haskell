@@ -183,10 +183,7 @@ string, or nil, if no sandbox configuration file was found."
                 (append .extensions .languages
                         flycheck-ghc-language-extensions))
     (setq-local flycheck-ghc-args
-                (append '("-hide-all-packages")
-                        (apply #'append (mapcar (lambda (p) (list "-package" p)) .dependencies))
-                        .other-options
-                        flycheck-ghc-args))))
+                (append .other-options flycheck-ghc-args))))
 
 (defun flycheck-haskell-configure ()
   "Set paths and package database for the current project."
