@@ -16,13 +16,21 @@
 -- You should have received a copy of the GNU General Public License along with
 -- this program.  If not, see <http://www.gnu.org/licenses/>.
 
+{-# LANGUAGE CPP                  #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 
 import Control.Arrow (second)
 import Data.List (nub, isPrefixOf)
 import Data.Maybe (listToMaybe)
-import Distribution.Compiler (CompilerFlavor(GHC),buildCompilerId)
+#ifdef useCompilerInfo
+import Distribution.Compiler (AbiTag(NoAbiTag),CompilerFlavor(GHC),CompilerId(CompilerId),CompilerInfo,buildCompilerId,buildCompilerFlavor,unknownCompilerInfo)
+import Distribution.Simple.Compiler                  (compilerInfo)
+import Distribution.Simple.Configure                 (configCompilerAuxEx)
+import Distribution.Simple.Setup                     (emptyConfigFlags)
+#else
+import Distribution.Compiler (CompilerFlavor(GHC),CompilerId(CompilerId),buildCompilerId,buildCompilerFlavor)
+#endif
 import Distribution.Package (PackageName(..),PackageIdentifier(..),Dependency(..))
 import Distribution.PackageDescription (PackageDescription(..),allBuildInfo
                                        ,BuildInfo(..)
@@ -40,6 +48,7 @@ import Language.Haskell.Extension (Extension(..),Language(..))
 import System.Environment (getArgs)
 import System.Exit (exitFailure)
 import System.FilePath ((</>),dropFileName,normalise)
+import System.Info (compilerVersion)
 
 data Sexp = SList [Sexp]
           | SString String
@@ -132,6 +141,11 @@ dumpCabalConfiguration cabalFile = do
                           (condBenchmarks genericDesc)
       genericDesc' = genericDesc { condTestSuites = flaggedTests
                                  , condBenchmarks = flaggedBenchmarks }
+#ifdef useCompilerInfo
+      buildCompilerId = unknownCompilerInfo (CompilerId buildCompilerFlavor compilerVersion) NoAbiTag
+#else
+      buildCompilerId = (CompilerId buildCompilerFlavor compilerVersion)
+#endif
   case finalizePackageDescription [] (const True) buildPlatform buildCompilerId [] genericDesc' of
     Left e -> putStrLn $ "Issue with package configuration\n" ++ show e
     Right (pkgDesc, _) -> print (dumpPackageDescription pkgDesc cabalFile)
