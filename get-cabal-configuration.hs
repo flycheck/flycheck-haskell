@@ -136,15 +136,14 @@ dumpCabalConfiguration cabalFile = do
       flaggedTests = map (second (mapTreeData enableTest))
                      (condTestSuites genericDesc)
       enableBenchmark bm = bm { benchmarkEnabled = True }
-      flaggedBenchmarks = map (\(n, bm) ->
-                                (n, mapTreeData enableBenchmark bm))
+      flaggedBenchmarks = map (second (mapTreeData enableBenchmark))
                           (condBenchmarks genericDesc)
       genericDesc' = genericDesc { condTestSuites = flaggedTests
                                  , condBenchmarks = flaggedBenchmarks }
 #ifdef useCompilerInfo
       buildCompilerId = unknownCompilerInfo (CompilerId buildCompilerFlavor compilerVersion) NoAbiTag
 #else
-      buildCompilerId = (CompilerId buildCompilerFlavor compilerVersion)
+      buildCompilerId = CompilerId buildCompilerFlavor compilerVersion
 #endif
   case finalizePackageDescription [] (const True) buildPlatform buildCompilerId [] genericDesc' of
     Left e -> putStrLn $ "Issue with package configuration\n" ++ show e
