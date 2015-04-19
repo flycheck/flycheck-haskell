@@ -87,6 +87,13 @@ scripts to extract information from Cabal files."
                                            (buffer-file-name))))
   "The helper to dump the Cabal configuration.")
 
+(defconst flycheck-haskell-flag-helper
+  (expand-file-name "get-cabal-flags.hs"
+                    (file-name-directory (if load-in-progress
+                                             load-file-name
+                                           (buffer-file-name))))
+  "The helper to dump the flags needed to dump the Cabal configuration.")
+
 (defconst flycheck-haskell-config-cache (make-hash-table :test 'equal)
   "Cache of Cabal configuration.
 
@@ -117,9 +124,19 @@ entry, or if the cache entry is outdated."
 
 (defun flycheck-haskell-read-cabal-configuration (cabal-file)
   "Read the Cabal configuration from CABAL-FILE."
+  (let ((args (flycheck-haskell-read-cabal-flags)))
+    (setq args (append args (list flycheck-haskell-helper cabal-file)))
+    (with-temp-buffer
+      (let ((result (apply 'call-process flycheck-haskell-runhaskell nil t nil args)))
+        (when (= result 0)
+          (goto-char (point-min))
+          (read (current-buffer)))))))
+
+(defun flycheck-haskell-read-cabal-flags ()
+  "Read the Cabal flag configuration."
   (with-temp-buffer
     (let ((result (call-process flycheck-haskell-runhaskell nil t nil
-                                flycheck-haskell-helper cabal-file)))
+                                flycheck-haskell-flag-helper)))
       (when (= result 0)
         (goto-char (point-min))
         (read (current-buffer))))))
