@@ -24,12 +24,12 @@ import Control.Arrow (second)
 import Data.List (nub, isPrefixOf)
 import Data.Maybe (listToMaybe)
 #ifdef useCompilerInfo
-import Distribution.Compiler (AbiTag(NoAbiTag),CompilerFlavor(GHC),CompilerId(CompilerId),CompilerInfo,buildCompilerId,buildCompilerFlavor,unknownCompilerInfo)
+import Distribution.Compiler (AbiTag(NoAbiTag),CompilerFlavor(GHC),CompilerId(CompilerId),CompilerInfo,buildCompilerFlavor,unknownCompilerInfo)
 import Distribution.Simple.Compiler                  (compilerInfo)
 import Distribution.Simple.Configure                 (configCompilerAuxEx)
 import Distribution.Simple.Setup                     (emptyConfigFlags)
 #else
-import Distribution.Compiler (CompilerFlavor(GHC),CompilerId(CompilerId),buildCompilerId,buildCompilerFlavor)
+import Distribution.Compiler (CompilerFlavor(GHC),CompilerId(CompilerId),buildCompilerFlavor)
 #endif
 import Distribution.Package (PackageName(..),PackageIdentifier(..),Dependency(..))
 import Distribution.PackageDescription (PackageDescription(..),allBuildInfo
