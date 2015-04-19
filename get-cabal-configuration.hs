@@ -19,6 +19,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 
+import Control.Arrow (second)
 import Data.List (nub, isPrefixOf)
 import Data.Maybe (listToMaybe)
 import Distribution.Compiler (CompilerFlavor(GHC),buildCompilerId)
@@ -123,7 +124,7 @@ dumpCabalConfiguration cabalFile = do
   genericDesc <- readPackageDescription silent cabalFile
   -- This let block is eerily like one in Cabal.Distribution.Simple.Configure
   let enableTest t = t { testEnabled = True }
-      flaggedTests = map (\(n, t) -> (n, mapTreeData enableTest t))
+      flaggedTests = map (second (mapTreeData enableTest))
                      (condTestSuites genericDesc)
       enableBenchmark bm = bm { benchmarkEnabled = True }
       flaggedBenchmarks = map (\(n, bm) ->
