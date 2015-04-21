@@ -148,8 +148,8 @@ flags to use."
                      (value (match-string-no-properties 1))
                      (version (read value)))
           (cond
-           ((>= version 1.22)
-            (list "-DuseCompilerInfo"))))))))
+           ((< version 1.22)
+            (list "-DuseCompilerId"))))))))
 
 (defun flycheck-haskell-read-and-cache-configuration (cabal-file)
   "Read and cache configuration from CABAL-FILE.

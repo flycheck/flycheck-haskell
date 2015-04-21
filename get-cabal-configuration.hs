@@ -23,13 +23,10 @@
 import Control.Arrow (second)
 import Data.List (nub, isPrefixOf)
 import Data.Maybe (listToMaybe)
-#ifdef useCompilerInfo
-import Distribution.Compiler (AbiTag(NoAbiTag),CompilerFlavor(GHC),CompilerId(CompilerId),CompilerInfo,buildCompilerFlavor,unknownCompilerInfo)
-import Distribution.Simple.Compiler                  (compilerInfo)
-import Distribution.Simple.Configure                 (configCompilerAuxEx)
-import Distribution.Simple.Setup                     (emptyConfigFlags)
-#else
+#ifdef useCompilerId
 import Distribution.Compiler (CompilerFlavor(GHC),CompilerId(CompilerId),buildCompilerFlavor)
+#else
+import Distribution.Compiler (AbiTag(NoAbiTag),CompilerFlavor(GHC),CompilerId(CompilerId),CompilerInfo,buildCompilerFlavor,unknownCompilerInfo)
 #endif
 import Distribution.Package (PackageName(..),PackageIdentifier(..),Dependency(..))
 import Distribution.PackageDescription (PackageDescription(..),allBuildInfo
@@ -140,14 +137,19 @@ dumpCabalConfiguration cabalFile = do
                           (condBenchmarks genericDesc)
       genericDesc' = genericDesc { condTestSuites = flaggedTests
                                  , condBenchmarks = flaggedBenchmarks }
-#ifdef useCompilerInfo
-      buildCompilerId = unknownCompilerInfo (CompilerId buildCompilerFlavor compilerVersion) NoAbiTag
-#else
-      buildCompilerId = CompilerId buildCompilerFlavor compilerVersion
-#endif
   case finalizePackageDescription [] (const True) buildPlatform buildCompilerId [] genericDesc' of
     Left e -> putStrLn $ "Issue with package configuration\n" ++ show e
     Right (pkgDesc, _) -> print (dumpPackageDescription pkgDesc cabalFile)
+
+#ifdef useCompilerId
+buildCompilerId :: CompilerId
+buildCompilerId =
+  CompilerId buildCompilerFlavor compilerVersion
+#else
+buildCompilerId :: CompilerInfo
+buildCompilerId =
+  unknownCompilerInfo (CompilerId buildCompilerFlavor compilerVersion) NoAbiTag
+#endif
 
 main :: IO ()
 main = do
