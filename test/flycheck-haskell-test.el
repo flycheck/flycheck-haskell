@@ -187,6 +187,15 @@
       (flycheck-haskell-compare-sets flycheck-ghc-search-path computed-path)
       (should (local-variable-p 'flycheck-ghc-search-path)))))
 
+;; We're running hlint from here because we depend on the flags that
+;; flycheck-haskell can derive for us
+(ert-deftest flycheck-haskell-hlint ()
+  (let ((args (flycheck-haskell-get-configuration-args flycheck-haskell-test-cabal-file)))
+    (with-temp-buffer
+      (let ((result (apply 'call-process "hlint" nil t nil "get-cabal-configuration.hs" args)))
+        (should (string= (buffer-string) "No suggestions\n"))
+        (should (= result 0))))))
+
 (provide 'flycheck-haskell-test)
 
 ;;; flycheck-haskell-test.el ends here
