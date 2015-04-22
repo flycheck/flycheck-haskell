@@ -125,7 +125,7 @@ entry, or if the cache entry is outdated."
 
 (defun flycheck-haskell-read-cabal-configuration (cabal-file)
   "Read the Cabal configuration from CABAL-FILE."
-  (let ((args (flycheck-haskell-get-configuration-args cabal-file)))
+  (let ((args (-map (lambda (d) (concat "-D" d)) (flycheck-haskell-get-cpp-defines cabal-file))))
     (setq args (append args (list flycheck-haskell-helper cabal-file)))
     (with-temp-buffer
       (let ((result (apply 'call-process flycheck-haskell-runhaskell nil t nil args)))
@@ -133,13 +133,13 @@ entry, or if the cache entry is outdated."
           (goto-char (point-min))
           (read (current-buffer)))))))
 
-(defun flycheck-haskell-get-configuration-args (cabal-file)
-  "Analyze cabal version output to determine flags for CABAL-FILE.
+(defun flycheck-haskell-get-cpp-defines (cabal-file)
+  "Analyze cabal version output to determine CPP defines for CABAL-FILE.
 
 Different versions of the Cabal library have different enough
 interfaces we have to use some CPP in our configuration helper.
 This code looks at the cabal library version to figure out what
-flags to use."
+defines to use."
   (with-temp-buffer
     (let ((result (call-process flycheck-haskell-cabal nil t nil "--version" cabal-file)))
       (when (= result 0)
@@ -149,7 +149,7 @@ flags to use."
                      (version (read value)))
           (cond
            ((< version 1.22)
-            (list "-DuseCompilerId"))))))))
+            (list "useCompilerId"))))))))
 
 (defun flycheck-haskell-read-and-cache-configuration (cabal-file)
   "Read and cache configuration from CABAL-FILE.

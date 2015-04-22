@@ -190,9 +190,10 @@
 ;; We're running hlint from here because we depend on the flags that
 ;; flycheck-haskell can derive for us
 (ert-deftest flycheck-haskell-hlint ()
-  (let ((args (flycheck-haskell-get-configuration-args flycheck-haskell-test-cabal-file)))
+  (let ((args (-map (lambda (d) (concat "--cpp-define=" d)) (flycheck-haskell-get-cpp-defines flycheck-haskell-test-cabal-file))))
+    (setq args (append args (list "get-cabal-configuration.hs")))
     (with-temp-buffer
-      (let ((result (apply 'call-process "hlint" nil t nil "get-cabal-configuration.hs" args)))
+      (let ((result (apply 'call-process "hlint" nil t nil args)))
         (should (string= (buffer-string) "No suggestions\n"))
         (should (= result 0))))))
 
