@@ -1,6 +1,8 @@
 master (in development)
 =======================
 
+- Handle Cabal conditionals [GH-31]
+
 0.6 (Apr 04, 2015)
 ==================
 
