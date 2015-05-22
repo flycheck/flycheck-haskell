@@ -70,6 +70,14 @@
   :group 'flycheck
   :link '(url-link :tag "Github" "https://github.com/flycheck/flycheck-haskell"))
 
+(defcustom flycheck-haskell-cabal "cabal"
+  "Path to the `cabal' executable.
+
+This library uses `cabal' to get information about how to extract
+information from Cabal files."
+  :type `(file :must-match t)
+  :group 'flycheck-haskell)
+
 (defcustom flycheck-haskell-runhaskell "runhaskell"
   "Path to the `runhaskell' executable.
 
@@ -117,12 +125,31 @@ entry, or if the cache entry is outdated."
 
 (defun flycheck-haskell-read-cabal-configuration (cabal-file)
   "Read the Cabal configuration from CABAL-FILE."
+  (let ((args (-map (lambda (d) (concat "-D" d)) (flycheck-haskell-get-cpp-defines cabal-file))))
+    (setq args (append args (list flycheck-haskell-helper cabal-file)))
+    (with-temp-buffer
+      (let ((result (apply 'call-process flycheck-haskell-runhaskell nil t nil args)))
+        (when (= result 0)
+          (goto-char (point-min))
+          (read (current-buffer)))))))
+
+(defun flycheck-haskell-get-cpp-defines (cabal-file)
+  "Analyze cabal version output to determine CPP defines for CABAL-FILE.
+
+Different versions of the Cabal library have different enough
+interfaces we have to use some CPP in our configuration helper.
+This code looks at the cabal library version to figure out what
+defines to use."
   (with-temp-buffer
-    (let ((result (call-process flycheck-haskell-runhaskell nil t nil
-                                flycheck-haskell-helper cabal-file)))
+    (let ((result (call-process flycheck-haskell-cabal nil t nil "--version" cabal-file)))
       (when (= result 0)
         (goto-char (point-min))
-        (read (current-buffer))))))
+        (-when-let* ((success (re-search-forward "^using version \\([[:digit:]]+\.[[:digit:]]+\\)[[:digit:].]* of the Cabal library" nil t nil))
+                     (value (match-string-no-properties 1))
+                     (version (read value)))
+          (cond
+           ((< version 1.22)
+            (list "useCompilerId"))))))))
 
 (defun flycheck-haskell-read-and-cache-configuration (cabal-file)
   "Read and cache configuration from CABAL-FILE.

@@ -16,27 +16,36 @@
 -- You should have received a copy of the GNU General Public License along with
 -- this program.  If not, see <http://www.gnu.org/licenses/>.
 
+{-# LANGUAGE CPP                  #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 
-import Control.Monad (liftM)
+import Control.Arrow (second)
 import Data.List (nub, isPrefixOf)
 import Data.Maybe (listToMaybe)
-import Distribution.Compiler (CompilerFlavor(GHC))
-import Distribution.Package (PackageName(..),Dependency(..))
+#ifdef useCompilerId
+import Distribution.Compiler (CompilerFlavor(GHC),CompilerId(CompilerId),buildCompilerFlavor)
+#else
+import Distribution.Compiler (AbiTag(NoAbiTag),CompilerFlavor(GHC),CompilerId(CompilerId),CompilerInfo,buildCompilerFlavor,unknownCompilerInfo)
+#endif
+import Distribution.Package (PackageName(..),PackageIdentifier(..),Dependency(..))
 import Distribution.PackageDescription (PackageDescription(..),allBuildInfo
                                        ,BuildInfo(..)
                                        ,usedExtensions,allLanguages
                                        ,hcOptions
-                                       ,exeName)
-import Distribution.PackageDescription.Configuration (flattenPackageDescription)
+                                       ,exeName
+                                       ,testEnabled,condTestSuites
+                                       ,benchmarkEnabled,condBenchmarks)
+import Distribution.PackageDescription.Configuration (finalizePackageDescription,mapTreeData)
 import Distribution.PackageDescription.Parse (readPackageDescription)
 import Distribution.Simple.BuildPaths (defaultDistPref)
+import Distribution.System (buildPlatform)
 import Distribution.Verbosity (silent)
 import Language.Haskell.Extension (Extension(..),Language(..))
 import System.Environment (getArgs)
 import System.Exit (exitFailure)
 import System.FilePath ((</>),dropFileName,normalise)
+import System.Info (compilerVersion)
 
 data Sexp = SList [Sexp]
           | SString String
@@ -112,14 +121,35 @@ dumpPackageDescription pkgDesc cabalFile = SList [
         sourceDirs = nub (map normalise (getSourceDirectories buildInfo cabalDir))
         exts = nub (concatMap usedExtensions buildInfo)
         langs = nub (concatMap allLanguages buildInfo)
-        deps = nub (buildDepends pkgDesc)
+        thisPackage = (pkgName . package) pkgDesc
+        deps = nub (filter (\(Dependency name _) -> name /= thisPackage) (buildDepends pkgDesc))
         otherOptions = nub (filter isFlycheckUsefulOption (concatMap (hcOptions GHC) buildInfo))
 
 dumpCabalConfiguration :: String -> IO ()
 dumpCabalConfiguration cabalFile = do
-  pkgDesc <- liftM flattenPackageDescription
-                   (readPackageDescription silent cabalFile)
-  print (dumpPackageDescription pkgDesc cabalFile)
+  genericDesc <- readPackageDescription silent cabalFile
+  -- This let block is eerily like one in Cabal.Distribution.Simple.Configure
+  let enableTest t = t { testEnabled = True }
+      flaggedTests = map (second (mapTreeData enableTest))
+                     (condTestSuites genericDesc)
+      enableBenchmark bm = bm { benchmarkEnabled = True }
+      flaggedBenchmarks = map (second (mapTreeData enableBenchmark))
+                          (condBenchmarks genericDesc)
+      genericDesc' = genericDesc { condTestSuites = flaggedTests
+                                 , condBenchmarks = flaggedBenchmarks }
+  case finalizePackageDescription [] (const True) buildPlatform buildCompilerId [] genericDesc' of
+    Left e -> putStrLn $ "Issue with package configuration\n" ++ show e
+    Right (pkgDesc, _) -> print (dumpPackageDescription pkgDesc cabalFile)
+
+#ifdef useCompilerId
+buildCompilerId :: CompilerId
+buildCompilerId =
+  CompilerId buildCompilerFlavor compilerVersion
+#else
+buildCompilerId :: CompilerInfo
+buildCompilerId =
+  unknownCompilerInfo (CompilerId buildCompilerFlavor compilerVersion) NoAbiTag
+#endif
 
 main :: IO ()
 main = do
