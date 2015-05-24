@@ -8,9 +8,11 @@ PKGDIR := $(shell EMACS=$(EMACS) $(CASK) package-directory)
 # Export the used EMACS to recipe environments
 export EMACS
 
+HS_BUILDDIR = build/hs
 EL_SRCS = flycheck-haskell.el
 EL_OBJS = $(EL_SRCS:.el=.elc)
-HS_SRCS = get-cabal-configuration.hs
+HS_SRCS = get-flags.hs get-cabal-configuration.hs
+HS_OBJS = $(HS_SRCS:.hs=)
 PACKAGE = flycheck-haskell-$(VERSION).tar
 
 EMACSBATCH = $(EMACS) -Q --batch $(EMACSFLAGS)
@@ -21,7 +23,7 @@ EMACSBATCH = $(EMACS) -Q --batch $(EMACSFLAGS)
 	deps
 
 # Build targets
-compile : $(EL_OBJS)
+compile : $(EL_OBJS) $(HS_OBJS)
 
 dist :
 	$(CASK) package
@@ -40,6 +42,9 @@ clean : clean-elc clean-hs clean-dist clean-deps
 clean-elc :
 	rm -rf $(EL_OBJS)
 
+clean-hs:
+	rm -rf $(HS_OBJS) $(HS_BUILDDIR)
+
 clean-dist :
 	rm -rf $(DISTDIR)
 
@@ -49,6 +54,12 @@ clean-deps :
 # File targets
 %.elc : %.el $(PKGDIR)
 	$(CASK) exec $(EMACSBATCH) -f batch-byte-compile $<
+
+%: %.hs
+	$(GHC) $(GHCFLAGS) -outputdir $(HS_BUILDDIR) -o $@ $<
+
+get-cabal-configuration: GHCFLAGS += $(shell ./get-flags)
+get-cabal-configuration: get-flags
 
 $(PKGDIR) : Cask
 	$(CASK) install
