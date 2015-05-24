@@ -75,7 +75,7 @@
 
 This library uses `cabal' to get information about how to extract
 information from Cabal files."
-  :type `(file :must-match t)
+  :type '(file :must-match t)
   :group 'flycheck-haskell)
 
 (defcustom flycheck-haskell-runhaskell "runhaskell"
@@ -83,7 +83,7 @@ information from Cabal files."
 
 This library uses `runhaskell' to run various Haskell helper
 scripts to extract information from Cabal files."
-  :type `(file :must-match t)
+  :type '(file :must-match t)
   :group 'flycheck-haskell)
 
 
