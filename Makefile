@@ -31,8 +31,8 @@ dist :
 	$(CASK) package
 
 # Test targets
-lint :
-	$(HLINT) $(HLINTFLAGS) $(HS_SRCS)
+lint : get-flags
+	$(HLINT) $(HLINTFLAGS) $(shell ./get-flags hlint) $(HS_SRCS)
 
 test : $(EL_OBJS)
 	$(CASK) exec $(EMACSBATCH) -l flycheck-haskell.elc \

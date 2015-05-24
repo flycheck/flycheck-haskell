@@ -17,18 +17,33 @@
 
 import Data.Version (Version (Version))
 import Distribution.Simple.Utils (cabalVersion)
+import System.Environment (getArgs)
 
-legacyFlags :: [String]
-legacyFlags = ["-DUSE_COMPILER_ID"]
+data Mode
+  = GHC
+  | HLint
+
+define :: Mode -> String -> String
+define GHC def = "-D" ++ def
+define HLint def = "--cpp-define=" ++ def
+
+legacyFlags :: Mode -> [String]
+legacyFlags mode = [define mode "USE_COMPILER_ID"]
 
 isLegacyCabal :: Bool
 isLegacyCabal = cabalVersion < Version [1,22] []
 
+getMode :: [String] -> Mode
+getMode ("hlint":_) = HLint
+getMode _ = GHC
+
 main :: IO ()
-main = mapM_ putStrLn flags
-  where flags =
+main =
+  do args <- getArgs
+     mapM_ putStrLn (flags (getMode args))
+  where flags mode =
           if isLegacyCabal
-             then legacyFlags
+             then legacyFlags mode
              else []
 
 -- Local Variables:
