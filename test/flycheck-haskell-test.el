@@ -1,6 +1,6 @@
 ;;; flycheck-haskell-test.el --- Flycheck Haskell: Test suite  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2014  Sebastian Wiesner <swiesner@lunaryorn.com>
+;; Copyright (C) 2014, 2015  Sebastian Wiesner <swiesner@lunaryorn.com>
 
 ;; Author: Sebastian Wiesner <swiesner@lunaryorn.com>
 
@@ -186,16 +186,6 @@
       (flycheck-haskell-process-configuration (flycheck-haskell-read-test-config))
       (flycheck-haskell-compare-sets flycheck-ghc-search-path computed-path)
       (should (local-variable-p 'flycheck-ghc-search-path)))))
-
-;; We're running hlint from here because we depend on the flags that
-;; flycheck-haskell can derive for us
-(ert-deftest flycheck-haskell-hlint ()
-  (let ((args (-map (lambda (d) (concat "--cpp-define=" d)) (flycheck-haskell-get-cpp-defines flycheck-haskell-test-cabal-file))))
-    (setq args (append args (list "get-cabal-configuration.hs")))
-    (with-temp-buffer
-      (let ((result (apply 'call-process "hlint" nil t nil args)))
-        (should (string= (buffer-string) "No suggestions\n"))
-        (should (= result 0))))))
 
 (provide 'flycheck-haskell-test)
 

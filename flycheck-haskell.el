@@ -70,31 +70,48 @@
   :group 'flycheck
   :link '(url-link :tag "Github" "https://github.com/flycheck/flycheck-haskell"))
 
-(defcustom flycheck-haskell-cabal "cabal"
-  "Path to the `cabal' executable.
-
-This library uses `cabal' to get information about how to extract
-information from Cabal files."
-  :type `(file :must-match t)
-  :group 'flycheck-haskell)
-
 (defcustom flycheck-haskell-runhaskell "runhaskell"
   "Path to the `runhaskell' executable.
 
 This library uses `runhaskell' to run various Haskell helper
 scripts to extract information from Cabal files."
-  :type `(file :must-match t)
+  :type '(file :must-match t)
   :group 'flycheck-haskell)
 
 
 ;;; Cabal support
+(defconst flycheck-haskell-directory
+  (file-name-directory (if load-in-progress
+                           load-file-name
+                         (buffer-file-name)))
+  "The package directory of flycheck-haskell.")
+
 (defconst flycheck-haskell-helper
-  (expand-file-name "get-cabal-configuration.hs"
-                    (file-name-directory (if load-in-progress
-                                             load-file-name
-                                           (buffer-file-name))))
+  (expand-file-name "get-cabal-configuration.hs" flycheck-haskell-directory)
   "The helper to dump the Cabal configuration.")
 
+(defconst flycheck-haskell-flags-helper
+  (expand-file-name "get-flags.hs" flycheck-haskell-directory)
+  "The helper to get compiler flags for the Cabal helper.")
+
+(defun flycheck-haskell--get-flags ()
+  "Get GHC flags to run the Cabal helper."
+  (process-lines flycheck-haskell-runhaskell
+                 flycheck-haskell-flags-helper))
+
+(defun flycheck-haskell-read-cabal-configuration (cabal-file)
+  "Read the Cabal configuration from CABAL-FILE."
+  (let ((args (append (flycheck-haskell--get-flags)
+                      (list flycheck-haskell-helper cabal-file))))
+    (with-temp-buffer
+      (let ((result (apply 'call-process flycheck-haskell-runhaskell
+                           nil t nil args)))
+        (when (= result 0)
+          (goto-char (point-min))
+          (read (current-buffer)))))))
+
+
+;;; Cabal configuration caching
 (defconst flycheck-haskell-config-cache (make-hash-table :test 'equal)
   "Cache of Cabal configuration.
 
@@ -123,34 +140,6 @@ entry, or if the cache entry is outdated."
           ;; The configuration is up to date, use it
           config)))))
 
-(defun flycheck-haskell-read-cabal-configuration (cabal-file)
-  "Read the Cabal configuration from CABAL-FILE."
-  (let ((args (-map (lambda (d) (concat "-D" d)) (flycheck-haskell-get-cpp-defines cabal-file))))
-    (setq args (append args (list flycheck-haskell-helper cabal-file)))
-    (with-temp-buffer
-      (let ((result (apply 'call-process flycheck-haskell-runhaskell nil t nil args)))
-        (when (= result 0)
-          (goto-char (point-min))
-          (read (current-buffer)))))))
-
-(defun flycheck-haskell-get-cpp-defines (cabal-file)
-  "Analyze cabal version output to determine CPP defines for CABAL-FILE.
-
-Different versions of the Cabal library have different enough
-interfaces we have to use some CPP in our configuration helper.
-This code looks at the cabal library version to figure out what
-defines to use."
-  (with-temp-buffer
-    (let ((result (call-process flycheck-haskell-cabal nil t nil "--version" cabal-file)))
-      (when (= result 0)
-        (goto-char (point-min))
-        (-when-let* ((success (re-search-forward "^using version \\([[:digit:]]+\.[[:digit:]]+\\)[[:digit:].]* of the Cabal library" nil t nil))
-                     (value (match-string-no-properties 1))
-                     (version (read value)))
-          (cond
-           ((< version 1.22)
-            (list "useCompilerId"))))))))
-
 (defun flycheck-haskell-read-and-cache-configuration (cabal-file)
   "Read and cache configuration from CABAL-FILE.
 
@@ -170,6 +159,8 @@ Return the configuration."
   (or (flycheck-haskell-get-cached-configuration cabal-file)
       (flycheck-haskell-read-and-cache-configuration cabal-file)))
 
+
+;;; Cabal sandbox support
 (defconst flycheck-haskell-sandbox-config "cabal.sandbox.config"
   "The file name of a Cabal sandbox configuration.")
 
@@ -200,6 +191,8 @@ string, or nil, if no sandbox configuration file was found."
                                                flycheck-haskell-sandbox-config))
     (expand-file-name flycheck-haskell-sandbox-config root-dir)))
 
+
+;;; Buffer setup
 (defun flycheck-haskell-process-configuration (config)
   "Process the a Cabal CONFIG."
   (let-alist config
