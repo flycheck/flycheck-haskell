@@ -112,8 +112,8 @@ getSourceDirectories :: [BuildInfo] -> FilePath -> [String]
 getSourceDirectories buildInfo cabalDir =
   map (cabalDir </>) (concatMap hsSourceDirs buildInfo)
 
-usefulOptions :: [String]
-usefulOptions =
+allowedOptions :: [String]
+allowedOptions =
   ["-W"
   ,"-w"
   ,"-Wall"
@@ -123,8 +123,8 @@ usefulOptions =
   ,"-F"
   ,"-cpp"]
 
-usefulOptionPrefixes :: [String]
-usefulOptionPrefixes =
+allowedOptionPrefixes :: [String]
+allowedOptionPrefixes =
   ["-fwarn-"
   ,"-fno-warn-"
   ,"-fcontext-stack="
@@ -137,10 +137,10 @@ usefulOptionPrefixes =
   ,"-pgm"
   ,"-opt"]
 
-isFlycheckUsefulOption :: String -> Bool
-isFlycheckUsefulOption opt =
-  elem opt usefulOptions ||
-  any (`isPrefixOf` opt) usefulOptionPrefixes
+isAllowedOption :: String -> Bool
+isAllowedOption opt =
+  elem opt allowedOptions ||
+  any (`isPrefixOf` opt) allowedOptionPrefixes
 
 dumpPackageDescription :: PackageDescription -> FilePath -> Sexp
 dumpPackageDescription pkgDesc cabalFile =
@@ -165,7 +165,7 @@ dumpPackageDescription pkgDesc cabalFile =
           nub (filter (\(Dependency name _) -> name /= thisPackage)
                       (buildDepends pkgDesc))
         otherOptions =
-          nub (filter isFlycheckUsefulOption (concatMap (hcOptions GHC) buildInfo))
+          nub (filter isAllowedOption (concatMap (hcOptions GHC) buildInfo))
 
 dumpCabalConfiguration :: String -> IO ()
 dumpCabalConfiguration cabalFile =
