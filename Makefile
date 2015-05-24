@@ -2,6 +2,8 @@ EMACS = emacs
 EMACSFLAGS =
 GHC = ghc
 GHCFLAGS = -Wall -Werror -O1
+HLINT = hlint
+HLINTFLAGS =
 CASK = cask
 PKGDIR := $(shell EMACS=$(EMACS) $(CASK) package-directory)
 
@@ -18,7 +20,7 @@ PACKAGE = flycheck-haskell-$(VERSION).tar
 EMACSBATCH = $(EMACS) -Q --batch $(EMACSFLAGS)
 
 .PHONY: compile dist \
-	test \
+	lint test \
 	clean clean-elc clean-dist clean-deps \
 	deps
 
@@ -29,6 +31,9 @@ dist :
 	$(CASK) package
 
 # Test targets
+lint :
+	$(HLINT) $(HLINTFLAGS) $(HS_SRCS)
+
 test : $(EL_OBJS)
 	$(CASK) exec $(EMACSBATCH) -l flycheck-haskell.elc \
 		-l test/flycheck-haskell-test.el -f ert-run-tests-batch-and-exit

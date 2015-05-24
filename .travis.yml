@@ -23,4 +23,5 @@ install:
   - cask install
 script:
   - make EMACS=$EMACS compile
+  - make HLINTFLAGS=-c lint
   - make EMACS=$EMACS test
