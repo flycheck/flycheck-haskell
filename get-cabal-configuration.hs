@@ -23,7 +23,7 @@
 import Control.Arrow (second)
 import Data.List (nub, isPrefixOf)
 import Data.Maybe (listToMaybe)
-#ifdef useCompilerId
+#ifdef USE_COMPILER_ID
 import Distribution.Compiler
        (CompilerFlavor(GHC), CompilerId(CompilerId), buildCompilerFlavor)
 #else
@@ -194,7 +194,7 @@ dumpCabalConfiguration cabalFile =
        Right (pkgDesc,_) ->
          print (dumpPackageDescription pkgDesc cabalFile)
 
-#ifdef useCompilerId
+#ifdef USE_COMPILER_ID
 buildCompilerId :: CompilerId
 buildCompilerId =
   CompilerId buildCompilerFlavor compilerVersion
