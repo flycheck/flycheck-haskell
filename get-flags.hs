@@ -1,4 +1,4 @@
--- Copyright (C) Michael Alan Dorman <mdorman@ironicdesign.com>
+-- Copyright (C) 2015 Michael Alan Dorman <mdorman@ironicdesign.com>
 
 -- This file is not part of GNU Emacs.
 
