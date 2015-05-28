@@ -161,11 +161,11 @@ Return the configuration."
   (or (flycheck-haskell-get-cached-configuration cabal-file)
       (flycheck-haskell-read-and-cache-configuration cabal-file)))
 
+
+;;; Cabal sandbox support
 (defconst flycheck-haskell-cabal-config "cabal.config"
   "The file name of a Cabal configuration.")
 
-
-;;; Cabal sandbox support
 (defconst flycheck-haskell-sandbox-config "cabal.sandbox.config"
   "The file name of a Cabal sandbox configuration.")
 
@@ -192,23 +192,13 @@ database was not found."
   (flycheck-haskell-with-config-file-buffer sandbox-config-file
     (flycheck-haskell-get-config-value "package-db")))
 
-(defconst flycheck-haskell-compiler-re
-  (rx line-start (zero-or-more (any space)) "with-compiler:"
-      (zero-or-more (any space))
-      (group (one-or-more (not (any space))))
-      (zero-or-more (any space) line-end))
-  "Regular expression to parse the compiler path.")
-
 (defun flycheck-haskell-get-compiler (cabal-config)
   "Get the compiler path from CABAL-CONFIG.
 
 Return the compiler path as string, or nil, if the database was
 not found."
-  (with-temp-buffer
-    (insert-file-contents cabal-config)
-    (goto-char (point-min))
-    (when (re-search-forward flycheck-haskell-compiler-re nil 'noerror)
-      (match-string 1))))
+  (flycheck-haskell-with-config-file-buffer cabal-config
+    (flycheck-haskell-get-config-value "with-compiler")))
 
 (defun flycheck-haskell-find-config (config-file)
   "Find a CONFIG-FILE for the current buffer.
