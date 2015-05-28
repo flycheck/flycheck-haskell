@@ -60,48 +60,13 @@
   (should (equal '() (-difference actual expected))))
 
 
-;;; Test cases
+;;; Customization
 
 (ert-deftest flycheck-haskell-runhaskell/default-value ()
   (should (string= flycheck-haskell-runhaskell "runhaskell")))
 
-(ert-deftest flycheck-haskell-clear-config-cache ()
-  (unwind-protect
-      (progn
-        (puthash "foo" "bar" flycheck-haskell-config-cache)
-        (should (= (hash-table-count flycheck-haskell-config-cache) 1))
-        (flycheck-haskell-clear-config-cache)
-        (should (= (hash-table-count flycheck-haskell-config-cache) 0)))
-    (clrhash flycheck-haskell-config-cache)))
-
-(ert-deftest flycheck-haskell-get-cached-configuration/no-cache-entry ()
-  (should-not (flycheck-haskell-get-cached-configuration
-               flycheck-haskell-test-cabal-file)))
-
-(ert-deftest flycheck-haskell-get-cached-configuration/cached-config ()
-  (flycheck-haskell-test-with-cache
-    (flycheck-haskell-read-and-cache-configuration
-     flycheck-haskell-test-cabal-file)
-    (should (= (hash-table-count flycheck-haskell-config-cache) 1))
-    (let ((config (flycheck-haskell-get-cached-configuration
-                   flycheck-haskell-test-cabal-file)))
-      (should (equal config
-                     (flycheck-haskell-read-cabal-configuration
-                      flycheck-haskell-test-cabal-file))))))
-
-(ert-deftest flycheck-haskell-get-cached-configuration/file-is-modified ()
-  (flycheck-haskell-test-with-cache
-    (flycheck-haskell-read-and-cache-configuration
-     flycheck-haskell-test-cabal-file)
-    (should (flycheck-haskell-get-cached-configuration
-             flycheck-haskell-test-cabal-file))
-    ;; Wait a second, to ensure that the current time advances
-    (sleep-for 1)
-    (set-file-times flycheck-haskell-test-cabal-file)
-    (should-not (flycheck-haskell-get-cached-configuration
-                 flycheck-haskell-test-cabal-file))
-    (should (= (hash-table-count flycheck-haskell-config-cache) 0))))
-
+
+;;; Cabal support
 (ert-deftest flycheck-haskell-read-cabal-configuration/has-all-extensions ()
   (flycheck-haskell-compare-sets (assq 'extensions (flycheck-haskell-read-test-config))
                                   '(extensions "OverloadedStrings"
@@ -141,6 +106,46 @@
         (should (eq (flycheck-haskell-get-cached-configuration cabal-file)
                     'dummy))))))
 
+
+;;; Configuration caching
+(ert-deftest flycheck-haskell-clear-config-cache ()
+  (unwind-protect
+      (progn
+        (puthash "foo" "bar" flycheck-haskell-config-cache)
+        (should (= (hash-table-count flycheck-haskell-config-cache) 1))
+        (flycheck-haskell-clear-config-cache)
+        (should (= (hash-table-count flycheck-haskell-config-cache) 0)))
+    (clrhash flycheck-haskell-config-cache)))
+
+(ert-deftest flycheck-haskell-get-cached-configuration/no-cache-entry ()
+  (should-not (flycheck-haskell-get-cached-configuration
+               flycheck-haskell-test-cabal-file)))
+
+(ert-deftest flycheck-haskell-get-cached-configuration/cached-config ()
+  (flycheck-haskell-test-with-cache
+    (flycheck-haskell-read-and-cache-configuration
+     flycheck-haskell-test-cabal-file)
+    (should (= (hash-table-count flycheck-haskell-config-cache) 1))
+    (let ((config (flycheck-haskell-get-cached-configuration
+                   flycheck-haskell-test-cabal-file)))
+      (should (equal config
+                     (flycheck-haskell-read-cabal-configuration
+                      flycheck-haskell-test-cabal-file))))))
+
+(ert-deftest flycheck-haskell-get-cached-configuration/file-is-modified ()
+  (flycheck-haskell-test-with-cache
+    (flycheck-haskell-read-and-cache-configuration
+     flycheck-haskell-test-cabal-file)
+    (should (flycheck-haskell-get-cached-configuration
+             flycheck-haskell-test-cabal-file))
+    ;; Wait a second, to ensure that the current time advances
+    (sleep-for 1)
+    (set-file-times flycheck-haskell-test-cabal-file)
+    (should-not (flycheck-haskell-get-cached-configuration
+                 flycheck-haskell-test-cabal-file))
+    (should (= (hash-table-count flycheck-haskell-config-cache) 0))))
+
+
 (ert-deftest flycheck-haskell-get-configuration/has-cache-entry ()
   (let* ((cabal-file flycheck-haskell-test-cabal-file)
          (mtime (nth 6 (file-attributes cabal-file))))
@@ -158,6 +163,8 @@
         (should (eq (flycheck-haskell-get-configuration cabal-file)
                     'dummy))))))
 
+
+;;; Buffer setup
 (ert-deftest flycheck-haskell-process-configuration/language-extensions ()
   (with-temp-buffer                     ; To scope the variables
     (flycheck-haskell-process-configuration (flycheck-haskell-read-test-config))
