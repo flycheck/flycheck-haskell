@@ -46,6 +46,10 @@
   (expand-file-name "cabal.sandbox.config" flycheck-haskell-test-dir)
   "Sandbox configuration file for our test suite.")
 
+(defconst flycheck-haskell-test-config-file
+  (expand-file-name "cabal.config" flycheck-haskell-test-dir)
+  "Cabal configuration file for our test suite.")
+
 
 ;;; Helpers
 
@@ -170,9 +174,14 @@
 
 ;;; Cabal sandbox support
 (ert-deftest flycheck-haskell-get-package-db/from-file ()
-  (let* ((db (flycheck-haskell-get-package-db
-              flycheck-haskell-test-sandbox-file)))
+  (let ((db (flycheck-haskell-get-package-db
+             flycheck-haskell-test-sandbox-file)))
     (should (equal db "/foo/bar/.cabal-sandbox/foo-packages.conf.d"))))
+
+(ert-deftest flycheck-haskell-get-compiler/from-file ()
+  (let ((compiler (flycheck-haskell-get-compiler
+                   flycheck-haskell-test-config-file)))
+    (should (equal compiler "/foo/bar/ghc-7.10"))))
 
 
 ;;; Buffer setup
