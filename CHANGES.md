@@ -1,6 +1,7 @@
 master (in development)
 =======================
 
+- Extract compiler from `cabal.config` [GH-28] [GH-29]
 - Handle Cabal conditionals [GH-31]
 
 0.6 (Apr 04, 2015)
