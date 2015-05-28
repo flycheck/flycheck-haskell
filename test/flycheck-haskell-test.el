@@ -67,6 +67,14 @@
   "Compare ACTUAL and EXPECTED ignoring ordering."
   (should (equal '() (-difference actual expected))))
 
+(defmacro flycheck-haskell-test-with-fake-file (&rest body)
+  "Run BODY with a fake file buffer."
+  (declare (indent 0))
+  `(with-temp-buffer
+     (let* ((default-directory flycheck-haskell-test-dir)
+            (buffer-file-name (expand-file-name "test.hs")))
+       ,@body)))
+
 
 ;;; Customization
 
@@ -213,6 +221,21 @@
       (flycheck-haskell-process-configuration (flycheck-haskell-read-test-config))
       (flycheck-haskell-compare-sets flycheck-ghc-search-path computed-path)
       (should (local-variable-p 'flycheck-ghc-search-path)))))
+
+(ert-deftest flycheck-haskell-configure/ghc-executable ()
+  (flycheck-haskell-test-with-fake-file
+    (flycheck-haskell-configure)
+    (should (equal flycheck-haskell-ghc-executable "/foo/bar/ghc-7.10"))
+    (should (local-variable-p 'flycheck-haskell-ghc-executable))))
+
+(ert-deftest flycheck-haskell-configure/package-database ()
+  (flycheck-haskell-test-with-fake-file
+    (flycheck-haskell-configure)
+    (should (equal flycheck-ghc-package-databases
+                   '("/foo/bar/.cabal-sandbox/foo-packages.conf.d")))
+    (should (local-variable-p 'flycheck-ghc-package-databases))
+    (should (equal flycheck-ghc-no-user-package-database t))
+    (should (local-variable-p 'flycheck-ghc-no-user-package-database))))
 
 (provide 'flycheck-haskell-test)
 
