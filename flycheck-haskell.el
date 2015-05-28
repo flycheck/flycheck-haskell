@@ -210,23 +210,27 @@ not found."
     (when (re-search-forward flycheck-haskell-compiler-re nil 'noerror)
       (match-string 1))))
 
+(defun flycheck-haskell-find-config (config-file)
+  "Find a CONFIG-FILE for the current buffer.
+
+Return the absolute path of CONFIG-FILE as string, or nil if
+CONFIG-FILE was not found."
+  (-when-let (root-dir (locate-dominating-file (buffer-file-name) config-file))
+    (expand-file-name config-file root-dir)))
+
 (defun flycheck-haskell-find-cabal-config ()
   "Find Cabal configuration for the current buffer.
 
 Return the absolute path of the configuration file as
-string, or nil, if no sandbox configuration file was found."
-  (-when-let (root-dir (locate-dominating-file (buffer-file-name)
-                                               flycheck-haskell-cabal-config))
-    (expand-file-name flycheck-haskell-sandbox-config root-dir)))
+string, or nil if no Cabal configuration file was found."
+  (flycheck-haskell-find-config flycheck-haskell-cabal-config))
 
 (defun flycheck-haskell-find-sandbox-config ()
   "Find Cabal sandbox configuration for the current buffer.
 
 Return the absolute path of the sandbox configuration file as
-string, or nil, if no sandbox configuration file was found."
-  (-when-let (root-dir (locate-dominating-file (buffer-file-name)
-                                               flycheck-haskell-sandbox-config))
-    (expand-file-name flycheck-haskell-sandbox-config root-dir)))
+string, or nil if no sandbox configuration file was found."
+  (flycheck-haskell-find-config flycheck-haskell-sandbox-config))
 
 
 ;;; Buffer setup
