@@ -181,15 +181,16 @@
 
 
 ;;; Cabal sandbox support
-(ert-deftest flycheck-haskell-get-package-db/from-file ()
-  (let ((db (flycheck-haskell-get-package-db
-             flycheck-haskell-test-sandbox-file)))
-    (should (equal db "/foo/bar/.cabal-sandbox/foo-packages.conf.d"))))
+(ert-deftest flycheck-haskell-get-cabal-config ()
+  (flycheck-haskell-test-with-fake-file
+    (let ((config (flycheck-haskell-get-cabal-config)))
+      (should (equal config '((with-compiler . "/foo/bar/ghc-7.10")))))))
 
-(ert-deftest flycheck-haskell-get-compiler/from-file ()
-  (let ((compiler (flycheck-haskell-get-compiler
-                   flycheck-haskell-test-config-file)))
-    (should (equal compiler "/foo/bar/ghc-7.10"))))
+(ert-deftest flycheck-haskell-get-sandbox-config ()
+  (flycheck-haskell-test-with-fake-file
+    (let ((config (flycheck-haskell-get-sandbox-config))
+          (db "/foo/bar/.cabal-sandbox/foo-packages.conf.d"))
+      (should (equal config `((package-db . ,db)))))))
 
 
 ;;; Buffer setup

@@ -166,8 +166,14 @@ Return the configuration."
 (defconst flycheck-haskell-cabal-config "cabal.config"
   "The file name of a Cabal configuration.")
 
+(defconst flycheck-haskell-cabal-config-keys '(with-compiler)
+  "Keys to parse from a Cabal configuration file.")
+
 (defconst flycheck-haskell-sandbox-config "cabal.sandbox.config"
   "The file name of a Cabal sandbox configuration.")
+
+(defconst flycheck-haskell-sandbox-config-keys '(package-db)
+  "Keys to parse from a Cabal sandbox configuration.")
 
 (defmacro flycheck-haskell-with-config-file-buffer (file-name &rest body)
   "Eval BODY in a buffer with the contents of FILE-NAME."
@@ -178,27 +184,22 @@ Return the configuration."
      ,@body))
 
 (defun flycheck-haskell-get-config-value (key)
-  "Get the value of a configuration KEY from this buffer."
-  (substring-no-properties
-   (save-excursion
-     (goto-char (point-min))
-     (haskell-cabal-get-setting key))))
+  "Get the value of a configuration KEY from this buffer.
 
-(defun flycheck-haskell-get-package-db (sandbox-config-file)
-  "Get the package database directory from SANDBOX-CONFIG-FILE.
+KEY is a symbol denoting the key whose value to get.  Return
+a `(KEY . VALUE)' cons cell."
+  (save-excursion
+    (goto-char (point-min))
+    (cons key (substring-no-properties
+               (haskell-cabal-get-setting (symbol-name key))))))
 
-Return the package database directory as string, or nil, if the
-database was not found."
-  (flycheck-haskell-with-config-file-buffer sandbox-config-file
-    (flycheck-haskell-get-config-value "package-db")))
+(defun flycheck-haskell-parse-config-file (keys config-file)
+  "Parse KEYS from CONFIG-FILE.
 
-(defun flycheck-haskell-get-compiler (cabal-config)
-  "Get the compiler path from CABAL-CONFIG.
-
-Return the compiler path as string, or nil, if the database was
-not found."
-  (flycheck-haskell-with-config-file-buffer cabal-config
-    (flycheck-haskell-get-config-value "with-compiler")))
+KEYS is a list of symbols.  Return an alist with all parsed
+KEYS."
+  (flycheck-haskell-with-config-file-buffer config-file
+    (mapcar #'flycheck-haskell-get-config-value keys)))
 
 (defun flycheck-haskell-find-config (config-file)
   "Find a CONFIG-FILE for the current buffer.
@@ -208,19 +209,25 @@ CONFIG-FILE was not found."
   (-when-let (root-dir (locate-dominating-file (buffer-file-name) config-file))
     (expand-file-name config-file root-dir)))
 
-(defun flycheck-haskell-find-cabal-config ()
-  "Find Cabal configuration for the current buffer.
+(defun flycheck-haskell-get-cabal-config ()
+  "Get Cabal configuration for the current buffer.
 
-Return the absolute path of the configuration file as
-string, or nil if no Cabal configuration file was found."
-  (flycheck-haskell-find-config flycheck-haskell-cabal-config))
+Return an alist with the Cabal configuration for the current
+buffer."
+  (-when-let (file-name (flycheck-haskell-find-config
+                         flycheck-haskell-cabal-config))
+    (flycheck-haskell-parse-config-file flycheck-haskell-cabal-config-keys
+                                        file-name)))
 
-(defun flycheck-haskell-find-sandbox-config ()
-  "Find Cabal sandbox configuration for the current buffer.
+(defun flycheck-haskell-get-sandbox-config ()
+  "Get sandbox configuration for the current buffer.
 
-Return the absolute path of the sandbox configuration file as
-string, or nil if no sandbox configuration file was found."
-  (flycheck-haskell-find-config flycheck-haskell-sandbox-config))
+Return an alist with the sandbox configuration for the current
+buffer."
+  (-when-let (file-name (flycheck-haskell-find-config
+                         flycheck-haskell-sandbox-config))
+    (flycheck-haskell-parse-config-file flycheck-haskell-sandbox-config-keys
+                                        file-name)))
 
 
 ;;; Buffer setup
@@ -244,14 +251,12 @@ string, or nil if no sandbox configuration file was found."
                  (config (flycheck-haskell-get-configuration cabal-file)))
       (flycheck-haskell-process-configuration config))
 
-    (-when-let* ((config (flycheck-haskell-find-cabal-config))
-                 (compiler (flycheck-haskell-get-compiler config)))
-      (setq-local flycheck-haskell-ghc-executable compiler))
+    (let-alist (flycheck-haskell-get-cabal-config)
+      (setq-local flycheck-haskell-ghc-executable .with-compiler))
 
-    (-when-let* ((config (flycheck-haskell-find-sandbox-config))
-                 (package-db (flycheck-haskell-get-package-db config)))
+    (let-alist (flycheck-haskell-get-sandbox-config)
       (setq-local flycheck-ghc-package-databases
-                  (cons package-db flycheck-ghc-package-databases))
+                  (cons .package-db flycheck-ghc-package-databases))
       (setq-local flycheck-ghc-no-user-package-database t))))
 
 ;;;###autoload
