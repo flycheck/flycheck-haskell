@@ -252,7 +252,8 @@ buffer."
       (flycheck-haskell-process-configuration config))
 
     (let-alist (flycheck-haskell-get-cabal-config)
-      (setq-local flycheck-haskell-ghc-executable .with-compiler))
+      (when .with-compiler
+        (setq-local flycheck-haskell-ghc-executable .with-compiler)))
 
     (let-alist (flycheck-haskell-get-sandbox-config)
       (when .package-db

@@ -2,6 +2,7 @@ master (in development)
 =======================
 
 - Don’t choke when sandbox no is present [GH-35]
+- Don’t change GHC executable when compiler is not configured
 
 0.7 (May 28, 2015)
 ==================
