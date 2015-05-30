@@ -254,10 +254,11 @@ buffer."
     (let-alist (flycheck-haskell-get-cabal-config)
       (setq-local flycheck-haskell-ghc-executable .with-compiler))
 
-    (let-alist (flycheck-haskell-get-sandbox-config)
-      (setq-local flycheck-ghc-package-databases
-                  (cons .package-db flycheck-ghc-package-databases))
-      (setq-local flycheck-ghc-no-user-package-database t))))
+    (-when-let* ((sandbox-config (flycheck-haskell-get-sandbox-config)))
+      (let-alist sandbox-config
+        (setq-local flycheck-ghc-package-databases
+                    (cons .package-db flycheck-ghc-package-databases))
+        (setq-local flycheck-ghc-no-user-package-database t)))))
 
 ;;;###autoload
 (defun flycheck-haskell-setup ()
