@@ -255,9 +255,10 @@ buffer."
       (setq-local flycheck-haskell-ghc-executable .with-compiler))
 
     (let-alist (flycheck-haskell-get-sandbox-config)
-      (setq-local flycheck-ghc-package-databases
-                  (cons .package-db flycheck-ghc-package-databases))
-      (setq-local flycheck-ghc-no-user-package-database t))))
+      (when .package-db
+        (setq-local flycheck-ghc-package-databases
+                    (cons .package-db flycheck-ghc-package-databases))
+        (setq-local flycheck-ghc-no-user-package-database t)))))
 
 ;;;###autoload
 (defun flycheck-haskell-setup ()

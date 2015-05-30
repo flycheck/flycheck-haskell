@@ -1,6 +1,8 @@
 master (in development)
 =======================
 
+- Don’t choke when sandbox no is present [GH-35]
+
 0.7 (May 28, 2015)
 ==================
 
