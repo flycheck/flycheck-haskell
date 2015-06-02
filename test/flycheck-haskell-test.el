@@ -181,6 +181,27 @@
 
 
 ;;; Cabal sandbox support
+(ert-deftest flycheck-haskell-get-config-value/returns-value ()
+  (with-temp-buffer
+    (insert "spam: with eggs\n")
+    (goto-char (point-min))
+    (should (equal (flycheck-haskell-get-config-value 'spam)
+                   '(spam . "with eggs")))))
+
+(ert-deftest flycheck-haskell-get-config-value/no-text-properties ()
+  (with-temp-buffer
+    (insert "spam: with eggs\n")
+    (goto-char (point-min))
+    (add-text-properties 6 (line-end-position) '(face 'bold))
+    (let ((value (cdr (flycheck-haskell-get-config-value 'spam))))
+      (should-not (text-properties-at 0 value)))))
+
+(ert-deftest flycheck-haskell-get-config-value/no-such-key ()
+  (with-temp-buffer
+    (insert "spam: with eggs\n")
+    (goto-char (point-min))
+    (should-not (flycheck-haskell-get-config-value 'foo))))
+
 (ert-deftest flycheck-haskell-get-cabal-config ()
   (flycheck-haskell-test-with-fake-file
     (let ((config (flycheck-haskell-get-cabal-config)))
