@@ -190,8 +190,8 @@ KEY is a symbol denoting the key whose value to get.  Return
 a `(KEY . VALUE)' cons cell."
   (save-excursion
     (goto-char (point-min))
-    (cons key (substring-no-properties
-               (haskell-cabal-get-setting (symbol-name key))))))
+    (-when-let (setting (haskell-cabal-get-setting (symbol-name key)))
+      (cons key (substring-no-properties setting)))))
 
 (defun flycheck-haskell-parse-config-file (keys config-file)
   "Parse KEYS from CONFIG-FILE.
