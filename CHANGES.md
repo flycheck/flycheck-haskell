@@ -1,5 +1,5 @@
-master (in development)
-=======================
+0.7.2 (Jun 02, 2015)
+====================
 
 - Don’t choke when a configuration key is missing [GH-37]
 
