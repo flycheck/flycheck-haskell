@@ -1,6 +1,9 @@
 master (in development)
 =======================
 
+- Remove `flycheck-haskell-runhaskell` in favour of `flycheck-haskell-runghc`
+- Use `stack runghc` by default
+
 0.7.2 (Jun 02, 2015)
 ====================
 
