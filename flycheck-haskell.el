@@ -287,6 +287,54 @@ Also search for Cabal sandboxes and add them to the module search
 path as well."
   (add-hook 'hack-local-variables-hook #'flycheck-haskell-configure))
 
+
+;;; Stack Build syntax checker
+
+(flycheck-define-checker haskell-stack-build
+  "A Haskell syntax and type checker using `stack build'.
+
+Unlike Flycheck's built-in syntax checkers this syntax checker
+will actually compile the whole project.
+
+See URL `https://github.com/commercialhaskell/stack'."
+  :command ("stack" "build" "--ghc-options" "-Wall")
+  :error-patterns
+  ((warning line-start (file-name) ":" line ":" column ":"
+            (or " " "\n    ") "Warning:" (optional "\n")
+            (message
+             (one-or-more " ") (one-or-more not-newline)
+             (zero-or-more "\n"
+                           (one-or-more " ")
+                           (one-or-more not-newline)))
+            line-end)
+   (error line-start (file-name) ":" line ":" column ":"
+          (or (message (one-or-more not-newline))
+              (and "\n"
+                   (message
+                    (one-or-more " ") (one-or-more not-newline)
+                    (zero-or-more "\n"
+                                  (one-or-more " ")
+                                  (one-or-more not-newline)))))
+          line-end))
+  :error-filter
+  (lambda (errors)
+    (flycheck-sanitize-errors (flycheck-dedent-error-messages errors)))
+  :predicate
+  (lambda () (and (buffer-file-name)
+                  ;; We must have a stack.yml for this checker
+                  (locate-dominating-file (buffer-file-name) "stack.yaml")))
+  :verify (lambda (_)
+            (let ((stack-root (locate-dominating-file (buffer-file-name)
+                                                        "stack.yaml")))
+              (list (flycheck-verification-result-new
+                     :label "stack.yaml"
+                     :message (if stack-root
+                                  (format "found in %s" stack-root)
+                                "not found")
+                     :face (if stack-root 'success '(bold error))))))
+  :modes (haskell-mode literate-haskell-mode)
+  :next-checkers ((warning . haskell-hlint)))
+
 (provide 'flycheck-haskell)
 
 ;; Local Variables:
