@@ -121,7 +121,7 @@ Take the base command from `flycheck-haskell-runghc-command'."
          (command (flycheck-haskell-runghc-command args)))
     (with-temp-buffer
       (let ((result (apply 'call-process (car command)
-                           nil t nil (cdr args))))
+                           nil t nil (cdr command))))
         (when (= result 0)
           (goto-char (point-min))
           (read (current-buffer)))))))
