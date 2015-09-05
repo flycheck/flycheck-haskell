@@ -76,12 +76,6 @@
        ,@body)))
 
 
-;;; Customization
-
-(ert-deftest flycheck-haskell-runhaskell/default-value ()
-  (should (string= flycheck-haskell-runhaskell "runhaskell")))
-
-
 ;;; Cabal support
 (ert-deftest flycheck-haskell-read-cabal-configuration/has-all-extensions ()
   (flycheck-haskell-compare-sets (assq 'extensions (flycheck-haskell-read-test-config))
