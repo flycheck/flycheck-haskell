@@ -121,11 +121,12 @@ Take the base command from `flycheck-haskell-runghc-command'."
                        (list flycheck-haskell-helper cabal-file)))
          (command (flycheck-haskell-runghc-command args)))
     (with-temp-buffer
-      (let ((result (apply 'call-process (car command)
-                           nil t nil (cdr command))))
-        (when (= result 0)
-          (goto-char (point-min))
-          (read (current-buffer)))))))
+      (pcase (apply 'call-process (car command) nil t nil (cdr command))
+        (0 (goto-char (point-min))
+           (read (current-buffer)))
+        (retcode (message "Reading Haskell configuration failed with exit code %s and output:\n%s"
+                          retcode (buffer-string))
+                 nil)))))
 
 
 ;;; Cabal configuration caching
