@@ -110,9 +110,10 @@ Take the base command from `flycheck-haskell-runghc-command'."
 
 (defun flycheck-haskell--get-flags ()
   "Get GHC flags to run the Cabal helper."
-  (apply #'process-lines
-         (flycheck-haskell-runghc-command
-          (list flycheck-haskell-flags-helper))))
+  (ignore-errors
+    (apply #'process-lines
+           (flycheck-haskell-runghc-command
+            (list flycheck-haskell-flags-helper)))))
 
 (defun flycheck-haskell-read-cabal-configuration (cabal-file)
   "Read the Cabal configuration from CABAL-FILE."
