@@ -4,6 +4,7 @@ master (in development)
 - Remove `flycheck-haskell-runhaskell` in favour of `flycheck-haskell-runghc`
 - Use `stack runghc` by default
 - Only make dependent packages visible to GHC [GH-47] [GH-48]
+- Add Stack build directories to GHC search path [GH-48]
 
 0.7.2 (Jun 02, 2015)
 ====================
