@@ -24,6 +24,7 @@
 import Control.Arrow (second)
 import Data.List (nub, isPrefixOf)
 import Data.Maybe (listToMaybe)
+import Data.Version (showVersion)
 #ifdef USE_COMPILER_ID
 import Distribution.Compiler
        (CompilerFlavor(GHC), CompilerId(CompilerId), buildCompilerFlavor)
@@ -42,7 +43,9 @@ import Distribution.PackageDescription.Configuration
        (finalizePackageDescription, mapTreeData)
 import Distribution.PackageDescription.Parse (readPackageDescription)
 import Distribution.Simple.BuildPaths (defaultDistPref)
+import Distribution.Simple.Utils (cabalVersion)
 import Distribution.System (buildPlatform)
+import Distribution.Text (display)
 import Distribution.Verbosity (silent)
 import Language.Haskell.Extension (Extension(..),Language(..))
 import System.Environment (getArgs)
@@ -54,6 +57,8 @@ data Sexp
     = SList [Sexp]
     | SString String
     | SSymbol String
+
+data TargetTool = Cabal | Stack
 
 sym :: String -> Sexp
 sym = SSymbol
@@ -87,13 +92,19 @@ instance ToSexp Sexp where
 cons :: (ToSexp a, ToSexp b) => a -> [b] -> Sexp
 cons h t = SList (toSexp h : map toSexp t)
 
-getBuildDirectories :: PackageDescription -> FilePath -> [String]
-getBuildDirectories pkgDesc cabalDir =
+getBuildDirectories :: TargetTool -> PackageDescription -> FilePath -> [String]
+getBuildDirectories tool pkgDesc cabalDir =
     case library pkgDesc of
         Just _ -> buildDir : buildDirs
         Nothing -> buildDirs
   where
-    distDir = cabalDir </> defaultDistPref
+    distDir = cabalDir </>
+              case tool of
+                  Stack -> ".stack-work"
+                           </> defaultDistPref
+                           </> display buildPlatform
+                           </> "Cabal-" ++ showVersion cabalVersion
+                  Cabal -> defaultDistPref
     buildDir = distDir </> "build"
     autogenDir = buildDir </> "autogen"
     executableBuildDir e = buildDir </> exeName e </> (exeName e ++ "-tmp")
@@ -135,7 +146,7 @@ isAllowedOption opt =
 dumpPackageDescription :: PackageDescription -> FilePath -> Sexp
 dumpPackageDescription pkgDesc cabalFile =
     SList
-        [ cons (sym "build-directories") buildDirs
+        [ cons (sym "build-directories") (buildDirs ++ stackDirs)
         , cons (sym "source-directories") sourceDirs
         , cons (sym "extensions") exts
         , cons (sym "languages") langs
@@ -144,7 +155,8 @@ dumpPackageDescription pkgDesc cabalFile =
   where
     cabalDir = dropFileName cabalFile
     buildInfo = allBuildInfo pkgDesc
-    buildDirs = nub (map normalise (getBuildDirectories pkgDesc cabalDir))
+    buildDirs = nub (map normalise (getBuildDirectories Cabal pkgDesc cabalDir))
+    stackDirs = nub (map normalise (getBuildDirectories Stack pkgDesc cabalDir))
     sourceDirs = nub (map normalise (getSourceDirectories buildInfo cabalDir))
     exts = nub (concatMap usedExtensions buildInfo)
     langs = nub (concatMap allLanguages buildInfo)
@@ -158,7 +170,7 @@ dumpPackageDescription pkgDesc cabalFile =
     otherOptions =
         nub (filter isAllowedOption (concatMap (hcOptions GHC) buildInfo))
 
-dumpCabalConfiguration :: String -> IO ()
+dumpCabalConfiguration :: FilePath -> IO ()
 dumpCabalConfiguration cabalFile = do
     genericDesc <- readPackageDescription silent cabalFile
     -- This let block is eerily like one in Cabal.Distribution.Simple.Configure
