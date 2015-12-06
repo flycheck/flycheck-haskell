@@ -9,7 +9,7 @@
 ;; URL: https://github.com/flycheck/flycheck-haskell
 ;; Keywords: tools, convenience
 ;; Version: 0.8-cvs
-;; Package-Requires: ((emacs "24.1") (flycheck "0.22") (haskell-mode "13.7") (dash "2.4.0") (cl-lib "0.5") (let-alist "1.0.1"))
+;; Package-Requires: ((emacs "24.1") (flycheck "0.22") (haskell-mode "13.7") (dash "2.4.0") (seq "1.11") (let-alist "1.0.1"))
 
 ;; This file is not part of GNU Emacs.
 
@@ -59,7 +59,7 @@
   (require 'rx)
   (require 'let-alist))
 
-(require 'cl-lib)
+(require 'seq)
 (require 'haskell-cabal)
 (require 'flycheck)
 (require 'dash)
@@ -260,8 +260,8 @@ buffer."
     (setq-local flycheck-ghc-args
                 (append .other-options
                         (cons "-hide-all-packages"
-                              (cl-mapcan (apply-partially #'list "-package")
-                                         .dependencies))
+                              (seq-mapcat (apply-partially #'list "-package")
+                                          .dependencies))
                         flycheck-ghc-args))))
 
 (defun flycheck-haskell-configure ()
