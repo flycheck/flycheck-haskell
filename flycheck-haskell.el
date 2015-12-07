@@ -75,7 +75,7 @@
 
 (defcustom flycheck-haskell-runghc-command
   (if (executable-find "stack")
-      '("stack" "--verbosity" "silent" "runghc")
+      '("stack" "--verbosity" "silent" "runghc" "--")
     '("runghc"))
   "Command for `runghc'.
 
