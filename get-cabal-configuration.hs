@@ -1,6 +1,7 @@
 -- Copyright (C) 2014, 2015 Sebastian Wiesner <swiesner@lunaryorn.com>
--- Copyright (C) 2014 Gracjan Polak <gracjanpolak@gmail.com>
+-- Copyright (C) 2015 Mark Karpov <markkarpov@opmbx.org>
 -- Copyright (C) 2015 Michael Alan Dorman <mdorman@ironicdesign.com>
+-- Copyright (C) 2014 Gracjan Polak <gracjanpolak@gmail.com>
 
 -- This file is not part of GNU Emacs.
 
