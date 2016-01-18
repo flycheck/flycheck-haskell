@@ -93,20 +93,19 @@ instance ToSexp Sexp where
 cons :: (ToSexp a, ToSexp b) => a -> [b] -> Sexp
 cons h t = SList (toSexp h : map toSexp t)
 
+distDir :: TargetTool -> FilePath
+distDir Cabal = defaultDistPref
+distDir Stack = ".stack-work" </> defaultDistPref
+                              </> display buildPlatform
+                              </> "Cabal-" ++ showVersion cabalVersion
+
 getBuildDirectories :: TargetTool -> PackageDescription -> FilePath -> [String]
 getBuildDirectories tool pkgDesc cabalDir =
     case library pkgDesc of
         Just _ -> buildDir : buildDirs
         Nothing -> buildDirs
   where
-    distDir = cabalDir </>
-              case tool of
-                  Stack -> ".stack-work"
-                           </> defaultDistPref
-                           </> display buildPlatform
-                           </> "Cabal-" ++ showVersion cabalVersion
-                  Cabal -> defaultDistPref
-    buildDir = distDir </> "build"
+    buildDir = cabalDir </> distDir tool </> "build"
     autogenDir = buildDir </> "autogen"
     executableBuildDir e = buildDir </> exeName e </> (exeName e ++ "-tmp")
     buildDirs = autogenDir : map executableBuildDir (executables pkgDesc)
@@ -114,6 +113,10 @@ getBuildDirectories tool pkgDesc cabalDir =
 getSourceDirectories :: [BuildInfo] -> FilePath -> [String]
 getSourceDirectories buildInfo cabalDir =
     map (cabalDir </>) (concatMap hsSourceDirs buildInfo)
+
+getAutogenDir :: TargetTool -> FilePath -> FilePath
+getAutogenDir tool cabalDir =
+    cabalDir </> distDir tool </> "build" </> "autogen"
 
 allowedOptions :: [String]
 allowedOptions =
@@ -152,7 +155,8 @@ dumpPackageDescription pkgDesc cabalFile =
         , cons (sym "extensions") exts
         , cons (sym "languages") langs
         , cons (sym "dependencies") deps
-        , cons (sym "other-options") otherOptions]
+        , cons (sym "other-options") otherOptions
+        , cons (sym "autogen-directories") [autogenDir, autogenDirStack]]
   where
     cabalDir = dropFileName cabalFile
     buildInfo = allBuildInfo pkgDesc
@@ -170,6 +174,8 @@ dumpPackageDescription pkgDesc cabalFile =
                  (buildDepends pkgDesc))
     otherOptions =
         nub (filter isAllowedOption (concatMap (hcOptions GHC) buildInfo))
+    autogenDir = normalise (getAutogenDir Cabal cabalDir)
+    autogenDirStack = normalise (getAutogenDir Stack cabalDir)
 
 dumpCabalConfiguration :: FilePath -> IO ()
 dumpCabalConfiguration cabalFile = do

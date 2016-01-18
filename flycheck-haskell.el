@@ -252,6 +252,9 @@ buffer."
                         flycheck-ghc-language-extensions))
     (setq-local flycheck-ghc-args
                 (append .other-options
+                        (seq-map (apply-partially #'concat "-I")
+                                 .autogen-directories)
+                        '("-optP-include" "-optPcabal_macros.h")
                         (cons "-hide-all-packages"
                               (seq-mapcat (apply-partially #'list "-package")
                                           .dependencies))
