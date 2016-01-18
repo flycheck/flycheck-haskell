@@ -11,18 +11,8 @@ Automatically configure [Flycheck][] for Haskell.
 Installation
 ------------
 
-As usual, from [MELPA][] or [MELPA Stable][].
-
-In your [`Cask`][cask] file:
-
-```cl
-(source gnu)
-(source melpa)
-
-(depends-on "flycheck-haskell")
-```
-
-In your `init.el`:
+Install `flycheck-haskell` from [MELPA][] or [MELPA Stable][] and add the
+following to your `init.el`:
 
 ```cl
 (eval-after-load 'flycheck
