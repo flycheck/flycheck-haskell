@@ -10,7 +10,7 @@
 ;; URL: https://github.com/flycheck/flycheck-haskell
 ;; Keywords: tools, convenience
 ;; Version: 0.8-cvs
-;; Package-Requires: ((emacs "24.1") (flycheck "0.22") (haskell-mode "13.7") (dash "2.4.0") (seq "1.11") (let-alist "1.0.1"))
+;; Package-Requires: ((emacs "24.3") (flycheck "0.25") (haskell-mode "13.7") (dash "2.4.0") (seq "1.11") (let-alist "1.0.1"))
 
 ;; This file is not part of GNU Emacs.
 
