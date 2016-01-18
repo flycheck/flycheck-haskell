@@ -258,7 +258,11 @@ buffer."
                         (cons "-hide-all-packages"
                               (seq-mapcat (apply-partially #'list "-package")
                                           .dependencies))
-                        flycheck-ghc-args))))
+                        flycheck-ghc-args))
+    (setq-local flycheck-hlint-args
+                (append (seq-mapcat (apply-partially #'list "--cpp-include")
+                                    .autogen-directories)
+                        '("--cpp-file" "cabal_macros.h")))))
 
 (defun flycheck-haskell-configure ()
   "Set paths and package database for the current project."
