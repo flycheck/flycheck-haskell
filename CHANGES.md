@@ -1,6 +1,8 @@
 master (in development)
 =======================
 
+- Support GHC 8.2 with Cabal 2.0 [GH-66]
+
 0.8 (May 24, 2016)
 ==================
 

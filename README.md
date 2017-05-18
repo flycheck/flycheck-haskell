@@ -19,6 +19,11 @@ following to your `init.el`:
   '(add-hook 'flycheck-mode-hook #'flycheck-haskell-setup))
 ```
 
+Supported GHC versions
+----------------------
+
+Tested with GHC `7.8.4`, `7.10.3`, `8.0.1`, `8.0.2`, `8.2.1-rc2`.
+
 Usage
 -----
 

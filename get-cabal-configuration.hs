@@ -20,13 +20,22 @@
 -- this program.  If not, see <http://www.gnu.org/licenses/>.
 
 {-# LANGUAGE CPP                  #-}
+{-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE FlexibleInstances #-}
 
-import Control.Arrow (second)
+module Main (main) where
+
+#if __GLASGOW_HASKELL__ >= 800
+#define Cabal2 MIN_VERSION_Cabal(2,0,0)
+#else
+-- Hack - we may actually be using Cabal 2.0 with e.g. 7.8 GHC. But
+-- that's not likely to occur for average user who's relying on
+-- packages bundled with GHC. The 2.0 Cabal is bundled starting with 8.2.1.
+#define Cabal2 0
+#endif
+
 import Data.List (nub, isPrefixOf)
 import Data.Maybe (listToMaybe)
-import Data.Version (showVersion)
 #ifdef USE_COMPILER_ID
 import Distribution.Compiler
        (CompilerFlavor(GHC), CompilerId(CompilerId), buildCompilerFlavor)
@@ -36,14 +45,12 @@ import Distribution.Compiler
         CompilerInfo, buildCompilerFlavor, unknownCompilerInfo)
 #endif
 import Distribution.Package
-       (PackageName(..), PackageIdentifier(..), Dependency(..))
+       (pkgName, Dependency(..))
 import Distribution.PackageDescription
-       (PackageDescription(..), allBuildInfo, BuildInfo(..),
-        usedExtensions, allLanguages, hcOptions, exeName, testEnabled,
-        condTestSuites, benchmarkEnabled, condBenchmarks)
-import Distribution.PackageDescription.Configuration
-       (finalizePackageDescription, mapTreeData)
-import Distribution.PackageDescription.Parse (readPackageDescription)
+       (GenericPackageDescription,
+        PackageDescription(..), allBuildInfo, BuildInfo(..),
+        usedExtensions, allLanguages, hcOptions, exeName,
+        Executable)
 import Distribution.Simple.BuildPaths (defaultDistPref)
 import Distribution.Simple.Utils (cabalVersion)
 import Distribution.System (buildPlatform)
@@ -54,6 +61,29 @@ import System.Environment (getArgs)
 import System.Exit (exitFailure)
 import System.FilePath ((</>),dropFileName,normalise)
 import System.Info (compilerVersion)
+
+#if __GLASGOW_HASKELL__ >= 710 && !Cabal2
+import Data.Version (Version)
+#endif
+
+#if Cabal2
+import Distribution.Package (unPackageName, depPkgName)
+import Distribution.PackageDescription.Configuration (finalizePD)
+import Distribution.Types.ComponentRequestedSpec (ComponentRequestedSpec(..))
+import Distribution.PackageDescription.Parse (readGenericPackageDescription)
+import Distribution.Types.UnqualComponentName (unUnqualComponentName)
+import qualified Distribution.Version as CabalVersion
+#else
+import Control.Arrow (second)
+import Data.Version (showVersion)
+import Distribution.Package (PackageName(..))
+import Distribution.PackageDescription
+       (TestSuite, Benchmark, condTestSuites, condBenchmarks,
+        benchmarkEnabled, testEnabled)
+import Distribution.PackageDescription.Configuration
+       (finalizePackageDescription, mapTreeData)
+import Distribution.PackageDescription.Parse (readPackageDescription)
+#endif
 
 data Sexp
     = SList [Sexp]
@@ -86,7 +116,11 @@ instance ToSexp Language where
     toSexp lang = toSexp (show lang)
 
 instance ToSexp Dependency where
+#if Cabal2
+    toSexp = toSexp . unPackageName . depPkgName
+#else
     toSexp (Dependency (PackageName dependency) _) = toSexp dependency
+#endif
 
 instance ToSexp Sexp where
     toSexp = id
@@ -98,7 +132,7 @@ distDir :: TargetTool -> FilePath
 distDir Cabal = defaultDistPref
 distDir Stack = ".stack-work" </> defaultDistPref
                               </> display buildPlatform
-                              </> "Cabal-" ++ showVersion cabalVersion
+                              </> "Cabal-" ++ cabalVersion'
 
 getBuildDirectories :: TargetTool -> PackageDescription -> FilePath -> [String]
 getBuildDirectories tool pkgDesc cabalDir =
@@ -108,7 +142,8 @@ getBuildDirectories tool pkgDesc cabalDir =
   where
     buildDir = cabalDir </> distDir tool </> "build"
     autogenDir = buildDir </> "autogen"
-    executableBuildDir e = buildDir </> exeName e </> (exeName e ++ "-tmp")
+    executableBuildDir :: Executable -> FilePath
+    executableBuildDir e = buildDir </> getExeName e </> (getExeName e ++ "-tmp")
     buildDirs = autogenDir : map executableBuildDir (executables pkgDesc)
 
 getSourceDirectories :: [BuildInfo] -> FilePath -> [String]
@@ -180,18 +215,42 @@ dumpPackageDescription pkgDesc cabalFile =
 
 dumpCabalConfiguration :: FilePath -> IO ()
 dumpCabalConfiguration cabalFile = do
-    genericDesc <- readPackageDescription silent cabalFile
-    -- This let block is eerily like one in Cabal.Distribution.Simple.Configure
-    let enableTest t =
-            t
-            { testEnabled = True
+    genericDesc <-
+#if Cabal2
+        readGenericPackageDescription silent cabalFile
+#else
+        readPackageDescription silent cabalFile
+#endif
+    case getConcretePackageDescription genericDesc of
+        Left e        -> putStrLn $ "Issue with package configuration\n" ++ show e
+        Right pkgDesc -> print (dumpPackageDescription pkgDesc cabalFile)
+
+getConcretePackageDescription
+    :: GenericPackageDescription
+    -> Either [Dependency] PackageDescription
+getConcretePackageDescription genericDesc = do
+#if Cabal2
+    let enabled :: ComponentRequestedSpec
+        enabled = ComponentRequestedSpec
+            { testsRequested      = True
+            , benchmarksRequested = True
             }
+    fst <$> finalizePD
+        []           -- Flag assignment
+        enabled      -- Enable all components
+        (const True) -- Whether given dependency is available
+        buildPlatform
+        buildCompilerId
+        []           -- Additional constraints
+        genericDesc
+#else
+    -- This let block is eerily like one in Cabal.Distribution.Simple.Configure
+    let enableTest :: TestSuite -> TestSuite
+        enableTest t = t { testEnabled = True }
+        enableBenchmark :: Benchmark -> Benchmark
+        enableBenchmark bm = bm { benchmarkEnabled = True }
         flaggedTests =
             map (second (mapTreeData enableTest)) (condTestSuites genericDesc)
-        enableBenchmark bm =
-            bm
-            { benchmarkEnabled = True
-            }
         flaggedBenchmarks =
             map
                 (second (mapTreeData enableBenchmark))
@@ -201,25 +260,49 @@ dumpCabalConfiguration cabalFile = do
             { condTestSuites = flaggedTests
             , condBenchmarks = flaggedBenchmarks
             }
-    case finalizePackageDescription
-             []
-             (const True)
-             buildPlatform
-             buildCompilerId
-             []
-             genericDesc' of
-        Left e -> putStrLn $ "Issue with package configuration\n" ++ show e
-        Right (pkgDesc,_) -> print (dumpPackageDescription pkgDesc cabalFile)
+    fmap fst $ finalizePackageDescription
+        []
+        (const True)
+        buildPlatform
+        buildCompilerId
+        []
+        genericDesc'
+#endif
+
 
 #ifdef USE_COMPILER_ID
 buildCompilerId :: CompilerId
 buildCompilerId = CompilerId buildCompilerFlavor compilerVersion
 #else
 buildCompilerId :: CompilerInfo
-buildCompilerId =
-    unknownCompilerInfo
-        (CompilerId buildCompilerFlavor compilerVersion)
-        NoAbiTag
+buildCompilerId = unknownCompilerInfo compId NoAbiTag
+  where
+    compId :: CompilerId
+    compId = CompilerId buildCompilerFlavor compVersion
+# if Cabal2
+    compVersion :: CabalVersion.Version
+    compVersion = CabalVersion.mkVersion' compilerVersion
+# else
+    compVersion :: Version
+    compVersion = compilerVersion
+# endif
+#endif
+
+getExeName :: Executable -> FilePath
+getExeName =
+#if Cabal2
+    unUnqualComponentName . exeName
+#else
+    exeName
+#endif
+
+-- Textual representation of cabal version
+cabalVersion' :: String
+cabalVersion' =
+#if Cabal2
+    CabalVersion.showVersion cabalVersion
+#else
+    showVersion cabalVersion
 #endif
 
 main :: IO ()
