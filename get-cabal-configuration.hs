@@ -34,6 +34,7 @@ module Main (main) where
 #define Cabal2 0
 #endif
 
+import qualified Control.Applicative
 import Data.List (nub, isPrefixOf)
 import Data.Maybe (listToMaybe)
 #ifdef USE_COMPILER_ID
@@ -235,7 +236,7 @@ getConcretePackageDescription genericDesc = do
             { testsRequested      = True
             , benchmarksRequested = True
             }
-    fst <$> finalizePD
+    fst Control.Applicative.<$> finalizePD
         []           -- Flag assignment
         enabled      -- Enable all components
         (const True) -- Whether given dependency is available
@@ -260,7 +261,7 @@ getConcretePackageDescription genericDesc = do
             { condTestSuites = flaggedTests
             , condBenchmarks = flaggedBenchmarks
             }
-    fmap fst $ finalizePackageDescription
+    fst Control.Applicative.<$> finalizePackageDescription
         []
         (const True)
         buildPlatform
