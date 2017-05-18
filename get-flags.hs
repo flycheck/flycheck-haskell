@@ -15,9 +15,26 @@
 -- You should have received a copy of the GNU General Public License along with
 -- this program.  If not, see <http://www.gnu.org/licenses/>.
 
+{-# LANGUAGE CPP #-}
+
+module Main (main) where
+
+#if __GLASGOW_HASKELL__ >= 800
+#define Cabal2 MIN_VERSION_Cabal(2,0,0)
+#else
+-- Hack - we may actually be using Cabal 2.0 with e.g. 7.8 GHC. But
+-- that's not likely to occur for average user who's relying on
+-- packages bundled with GHC. The 2.0 Cabal is bundled starting with 8.2.1.
+#define Cabal2 0
+#endif
+
 import Data.Version (Version (Version))
 import Distribution.Simple.Utils (cabalVersion)
 import System.Environment (getArgs)
+
+#if Cabal2
+import qualified Distribution.Version as CabalVersion
+#endif
 
 data Mode
   = GHC
@@ -31,7 +48,13 @@ legacyFlags :: Mode -> [String]
 legacyFlags mode = [define mode "USE_COMPILER_ID"]
 
 isLegacyCabal :: Bool
-isLegacyCabal = cabalVersion < Version [1, 22] []
+isLegacyCabal = cabalVersion < targetVersion
+  where
+    targetVersion =
+#if Cabal2
+        CabalVersion.mkVersion' $
+#endif
+        Version [1, 22] []
 
 getMode :: [String] -> Mode
 getMode ("hlint":_) = HLint
