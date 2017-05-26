@@ -68,7 +68,7 @@ import Data.Version (Version)
 #endif
 
 #if Cabal2
-import Distribution.Package (unPackageName, depPkgName)
+import Distribution.Package (unPackageName, depPkgName, PackageName)
 import Distribution.PackageDescription.Configuration (finalizePD)
 import Distribution.Types.ComponentRequestedSpec (ComponentRequestedSpec(..))
 import Distribution.PackageDescription.Parse (readGenericPackageDescription)
@@ -192,26 +192,42 @@ dumpPackageDescription pkgDesc cabalFile =
         , cons (sym "extensions") exts
         , cons (sym "languages") langs
         , cons (sym "dependencies") deps
-        , cons (sym "other-options") otherOptions
+        , cons (sym "other-options") $ cppOpts ++ ghcOpts
         , cons (sym "autogen-directories") [autogenDir, autogenDirStack]]
   where
+    cabalDir :: FilePath
     cabalDir = dropFileName cabalFile
+    buildInfo :: [BuildInfo]
     buildInfo = allBuildInfo pkgDesc
+    buildDirs :: [FilePath]
     buildDirs = nub (map normalise (getBuildDirectories Cabal pkgDesc cabalDir))
+    stackDirs :: [FilePath]
     stackDirs = nub (map normalise (getBuildDirectories Stack pkgDesc cabalDir))
+    sourceDirs :: [FilePath]
     sourceDirs = nub (map normalise (getSourceDirectories buildInfo cabalDir))
+    exts :: [Extension]
     exts = nub (concatMap usedExtensions buildInfo)
+    langs :: [Language]
     langs = nub (concatMap allLanguages buildInfo)
+    thisPackage :: PackageName
     thisPackage = (pkgName . package) pkgDesc
-    deps =
-        nub
+    deps :: [Dependency]
+    deps = nub
             (filter
                  (\(Dependency name _) ->
                        name /= thisPackage)
                  (buildDepends pkgDesc))
-    otherOptions =
+    -- The "cpp-options" configuration field.
+    cppOpts :: [String]
+    cppOpts =
+        nub (filter isAllowedOption (concatMap cppOptions buildInfo))
+    -- The "ghc-options" configuration field.
+    ghcOpts :: [String]
+    ghcOpts =
         nub (filter isAllowedOption (concatMap (hcOptions GHC) buildInfo))
+    autogenDir :: FilePath
     autogenDir = normalise (getAutogenDir Cabal cabalDir)
+    autogenDirStack :: FilePath
     autogenDirStack = normalise (getAutogenDir Stack cabalDir)
 
 dumpCabalConfiguration :: FilePath -> IO ()
