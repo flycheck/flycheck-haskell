@@ -108,6 +108,14 @@
           (should (seq-find (apply-partially #'string-match-p cabal-re)
                             .build-directories)))))))
 
+(ert-deftest flycheck-haskell-read-cabal-configuration/cpp-options ()
+  (let-alist (flycheck-haskell-read-test-config)
+    (should (member "-DDEBUG=1" .other-options))))
+
+(ert-deftest flycheck-haskell-read-cabal-configuration/ghc-options ()
+  (let-alist (flycheck-haskell-read-test-config)
+    (should (member "-Wall" .other-options))))
+
 (ert-deftest flycheck-haskell-get-configuration/no-cache-entry ()
   (let* ((cabal-file flycheck-haskell-test-cabal-file))
     (cl-letf (((symbol-function 'flycheck-haskell-read-cabal-configuration)
