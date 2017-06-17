@@ -1,4 +1,6 @@
 *.elc
+*.o
+*.hi
 
 /get-cabal-configuration
 /get-flags
