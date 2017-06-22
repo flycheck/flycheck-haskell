@@ -3,6 +3,7 @@ master (in development)
 
 - Support GHC 8.2 with Cabal 2.0 [GH-66]
 - Use `cpp-options` cabal file field to get more options for GHC [GH-68]
+- Fix obtaining configuration from cabal file if current directory has Prelude module in it [GH-70]
 
 0.8 (May 24, 2016)
 ==================

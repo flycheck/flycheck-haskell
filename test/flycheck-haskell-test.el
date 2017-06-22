@@ -72,6 +72,16 @@
             (buffer-file-name (expand-file-name "test.hs")))
        ,@body)))
 
+(defun flycheck-haskell--concat-dirs (&rest dirs)
+  "Combine multiple relative directory names into one.
+
+Combine directory names in DIRS into one long directory name
+using directory separator."
+  (cl-reduce
+   #'concat
+   (seq-map #'file-name-as-directory dirs)
+   :initial-value nil))
+
 
 ;;; Cabal support
 (ert-deftest flycheck-haskell-read-cabal-configuration/has-all-extensions ()
@@ -125,6 +135,20 @@
         (should (eq (flycheck-haskell-get-configuration cabal-file) 'dummy))
         (should (eq (flycheck-haskell-get-cached-configuration cabal-file)
                     'dummy))))))
+
+(ert-deftest flycheck-haskell-read-cabal-configuration/read-from-dir-that-has-prelude-module ()
+  (let* ((test-dir (flycheck-haskell--concat-dirs flycheck-haskell-test-dir
+                                                  "test-data"
+                                                  "project-with-prelude-module"))
+         (default-directory test-dir))
+    (cl-assert (file-regular-p (expand-file-name "foo.cabal" test-dir)))
+    (flycheck-haskell-read-cabal-configuration "foo.cabal")
+    (let-alist (flycheck-haskell-read-cabal-configuration "foo.cabal")
+      (should (equal .dependencies '("base")))
+      (should (equal .extensions '("OverloadedStrings")))
+      (should (equal .languages '("Haskell2010")))
+      (should (equal .other-options nil))
+      (should (equal .source-directories '("lib/"))))))
 
 
 ;;; Configuration caching

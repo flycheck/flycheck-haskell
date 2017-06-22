@@ -69,8 +69,8 @@
 
 (defcustom flycheck-haskell-runghc-command
   (if (executable-find "stack")
-      '("stack" "--verbosity" "silent" "runghc" "--no-ghc-package-path" "--")
-    '("runghc"))
+      '("stack" "--verbosity" "silent" "runghc" "--no-ghc-package-path" "--" "--ghc-arg=-i")
+    '("runghc" "-i"))
   "Command for `runghc'.
 
 This library uses `runghc' to run various Haskell helper scripts
