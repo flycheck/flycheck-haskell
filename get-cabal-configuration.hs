@@ -21,6 +21,7 @@
 
 {-# LANGUAGE CPP                  #-}
 {-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 
 module Main (main) where
@@ -35,8 +36,10 @@ module Main (main) where
 #endif
 
 import qualified Control.Applicative
-import Data.List (nub, isPrefixOf)
+import Data.List (isPrefixOf, nub)
 import Data.Maybe (listToMaybe)
+import Data.Set (Set)
+import qualified Data.Set as S
 #ifdef USE_COMPILER_ID
 import Distribution.Compiler
        (CompilerFlavor(GHC), CompilerId(CompilerId), buildCompilerFlavor)
@@ -155,8 +158,8 @@ getAutogenDir :: TargetTool -> FilePath -> FilePath
 getAutogenDir tool cabalDir =
     cabalDir </> distDir tool </> "build" </> "autogen"
 
-allowedOptions :: [String]
-allowedOptions =
+allowedOptions :: Set String
+allowedOptions = S.fromList
     [ "-W"
     , "-w"
     , "-Wall"
@@ -182,7 +185,7 @@ allowedOptionPrefixes =
 
 isAllowedOption :: String -> Bool
 isAllowedOption opt =
-    elem opt allowedOptions || any (`isPrefixOf` opt) allowedOptionPrefixes
+    S.member opt allowedOptions || any (`isPrefixOf` opt) allowedOptionPrefixes
 
 dumpPackageDescription :: PackageDescription -> FilePath -> Sexp
 dumpPackageDescription pkgDesc cabalFile =
@@ -200,31 +203,28 @@ dumpPackageDescription pkgDesc cabalFile =
     buildInfo :: [BuildInfo]
     buildInfo = allBuildInfo pkgDesc
     buildDirs :: [FilePath]
-    buildDirs = nub (map normalise (getBuildDirectories Cabal pkgDesc cabalDir))
+    buildDirs = ordNub (map normalise (getBuildDirectories Cabal pkgDesc cabalDir))
     stackDirs :: [FilePath]
-    stackDirs = nub (map normalise (getBuildDirectories Stack pkgDesc cabalDir))
+    stackDirs = ordNub (map normalise (getBuildDirectories Stack pkgDesc cabalDir))
     sourceDirs :: [FilePath]
-    sourceDirs = nub (map normalise (getSourceDirectories buildInfo cabalDir))
+    sourceDirs = ordNub (map normalise (getSourceDirectories buildInfo cabalDir))
     exts :: [Extension]
     exts = nub (concatMap usedExtensions buildInfo)
     langs :: [Language]
     langs = nub (concatMap allLanguages buildInfo)
     thisPackage :: PackageName
-    thisPackage = (pkgName . package) pkgDesc
+    thisPackage = pkgName (package pkgDesc)
     deps :: [Dependency]
-    deps = nub
-            (filter
-                 (\(Dependency name _) ->
-                       name /= thisPackage)
-                 (buildDepends pkgDesc))
+    deps =
+        nub (filter (\(Dependency name _) -> name /= thisPackage) (buildDepends pkgDesc))
     -- The "cpp-options" configuration field.
     cppOpts :: [String]
     cppOpts =
-        nub (filter isAllowedOption (concatMap cppOptions buildInfo))
+        ordNub (filter isAllowedOption (concatMap cppOptions buildInfo))
     -- The "ghc-options" configuration field.
     ghcOpts :: [String]
     ghcOpts =
-        nub (filter isAllowedOption (concatMap (hcOptions GHC) buildInfo))
+        ordNub (filter isAllowedOption (concatMap (hcOptions GHC) buildInfo))
     autogenDir :: FilePath
     autogenDir = normalise (getAutogenDir Cabal cabalDir)
     autogenDirStack :: FilePath
@@ -321,6 +321,15 @@ cabalVersion' =
 #else
     showVersion cabalVersion
 #endif
+
+ordNub :: forall a. Ord a => [a] -> [a]
+ordNub = go S.empty
+  where
+    go :: Set a -> [a] -> [a]
+    go _   []     = []
+    go acc (x:xs)
+        | S.member x acc = go acc xs
+        | otherwise      = x : go (S.insert x acc) xs
 
 main :: IO ()
 main = do
