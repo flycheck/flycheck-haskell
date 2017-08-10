@@ -35,9 +35,12 @@ module Main (main) where
 #define Cabal2 0
 #endif
 
-import qualified Control.Applicative
+import qualified Control.Applicative as A
+import Control.Arrow (first)
+import Data.Char (isSpace)
 import Data.List (isPrefixOf, nub)
 import Data.Maybe (listToMaybe)
+import Data.Monoid (Monoid(..))
 import Data.Set (Set)
 import qualified Data.Set as S
 #ifdef USE_COMPILER_ID
@@ -62,9 +65,10 @@ import Distribution.Text (display)
 import Distribution.Verbosity (silent)
 import Language.Haskell.Extension (Extension(..),Language(..))
 import System.Environment (getArgs)
-import System.Exit (exitFailure)
+import System.Exit (ExitCode(..), exitFailure)
 import System.FilePath ((</>),dropFileName,normalise)
 import System.Info (compilerVersion)
+import System.Process (readProcessWithExitCode)
 
 #if __GLASGOW_HASKELL__ >= 710 && !Cabal2
 import Data.Version (Version)
@@ -132,31 +136,51 @@ instance ToSexp Sexp where
 cons :: (ToSexp a, ToSexp b) => a -> [b] -> Sexp
 cons h t = SList (toSexp h : map toSexp t)
 
-distDir :: TargetTool -> FilePath
-distDir Cabal = defaultDistPref
-distDir Stack = ".stack-work" </> defaultDistPref
-                              </> display buildPlatform
-                              </> "Cabal-" ++ cabalVersion'
-
-getBuildDirectories :: TargetTool -> PackageDescription -> FilePath -> [String]
-getBuildDirectories tool pkgDesc cabalDir =
-    case library pkgDesc of
-        Just _ -> buildDir : buildDirs
-        Nothing -> buildDirs
+-- | Get possible dist directories
+distDir :: TargetTool -> WriterT [Warning] IO FilePath
+distDir Cabal = return defaultDistPref
+distDir Stack = do
+    -- TODO: find out which version of 'process' package has this function
+    (exitCode, stdOut, stdErr) <-
+        liftWriterT $ readProcessWithExitCode "stack" ["path", "--dist-dir"] []
+    case exitCode of
+        ExitSuccess -> do
+            let distDirectory = stripWhitespace stdOut
+            return distDirectory
+        ExitFailure _ -> do
+            tell [FailedToGetBuildDirFromStack stdErr]
+            return defaultDistDir
   where
-    buildDir = cabalDir </> distDir tool </> "build"
-    autogenDir = buildDir </> "autogen"
-    executableBuildDir :: Executable -> FilePath
-    executableBuildDir e = buildDir </> getExeName e </> (getExeName e ++ "-tmp")
-    buildDirs = autogenDir : map executableBuildDir (executables pkgDesc)
+    defaultDistDir :: FilePath
+    defaultDistDir =
+        ".stack-work" </> defaultDistPref
+                      </> display buildPlatform
+                      </> "Cabal-" ++ cabalVersion'
+
+getBuildDirectories
+    :: TargetTool
+    -> PackageDescription
+    -> FilePath
+    -> WriterT [Warning] IO ([FilePath], FilePath)
+getBuildDirectories tool pkgDesc cabalDir = do
+    distDir' <- distDir tool
+    let buildDir :: FilePath
+        buildDir   = cabalDir </> distDir' </> "build"
+        autogenDir :: FilePath
+        autogenDir = buildDir </> "autogen"
+        executableBuildDir :: Executable -> FilePath
+        executableBuildDir e = buildDir </> getExeName e </> (getExeName e ++ "-tmp")
+        buildDirs :: [FilePath]
+        buildDirs = autogenDir : map executableBuildDir (executables pkgDesc)
+
+        buildDirs' = case library pkgDesc of
+            Just _  -> buildDir : buildDirs
+            Nothing -> buildDirs
+    return (buildDirs', autogenDir)
 
 getSourceDirectories :: [BuildInfo] -> FilePath -> [String]
 getSourceDirectories buildInfo cabalDir =
     map (cabalDir </>) (concatMap hsSourceDirs buildInfo)
-
-getAutogenDir :: TargetTool -> FilePath -> FilePath
-getAutogenDir tool cabalDir =
-    cabalDir </> distDir tool </> "build" </> "autogen"
 
 allowedOptions :: Set String
 allowedOptions = S.fromList
@@ -187,25 +211,36 @@ isAllowedOption :: String -> Bool
 isAllowedOption opt =
     S.member opt allowedOptions || any (`isPrefixOf` opt) allowedOptionPrefixes
 
-dumpPackageDescription :: PackageDescription -> FilePath -> Sexp
-dumpPackageDescription pkgDesc cabalFile =
-    SList
-        [ cons (sym "build-directories") (buildDirs ++ stackDirs)
-        , cons (sym "source-directories") sourceDirs
-        , cons (sym "extensions") exts
-        , cons (sym "languages") langs
-        , cons (sym "dependencies") deps
-        , cons (sym "other-options") $ cppOpts ++ ghcOpts
-        , cons (sym "autogen-directories") [autogenDir, autogenDirStack]]
+-- | Warning that may be produced during configuration.
+data Warning =
+    FailedToGetBuildDirFromStack String -- ^ Stack's stderr.
+
+instance ToSexp Warning where
+    toSexp (FailedToGetBuildDirFromStack stdErr) =
+        toSexp $ "Failed to get build directory from stack:\n" ++ stdErr
+
+dumpPackageDescription :: PackageDescription -> FilePath -> IO Sexp
+dumpPackageDescription pkgDesc cabalFile = do
+    ((buildDirs, autogenDirs), warnings) <- runWriterT $ do
+        (cabalDirs, autogenDir)  <- getBuildDirectories Cabal pkgDesc cabalDir
+        (stackDirs, autogenDir') <- getBuildDirectories Stack pkgDesc cabalDir
+        return (cabalDirs ++ stackDirs, [autogenDir, autogenDir'])
+    return $
+        SList
+            [ cons (sym "build-directories") (ordNub (map normalise buildDirs))
+            , cons (sym "source-directories") sourceDirs
+            , cons (sym "extensions") exts
+            , cons (sym "languages") langs
+            , cons (sym "dependencies") deps
+            , cons (sym "other-options") (cppOpts ++ ghcOpts)
+            , cons (sym "autogen-directories") (map normalise autogenDirs)
+            , cons (sym "warnings") warnings
+            ]
   where
     cabalDir :: FilePath
     cabalDir = dropFileName cabalFile
     buildInfo :: [BuildInfo]
     buildInfo = allBuildInfo pkgDesc
-    buildDirs :: [FilePath]
-    buildDirs = ordNub (map normalise (getBuildDirectories Cabal pkgDesc cabalDir))
-    stackDirs :: [FilePath]
-    stackDirs = ordNub (map normalise (getBuildDirectories Stack pkgDesc cabalDir))
     sourceDirs :: [FilePath]
     sourceDirs = ordNub (map normalise (getSourceDirectories buildInfo cabalDir))
     exts :: [Extension]
@@ -225,10 +260,6 @@ dumpPackageDescription pkgDesc cabalFile =
     ghcOpts :: [String]
     ghcOpts =
         ordNub (filter isAllowedOption (concatMap (hcOptions GHC) buildInfo))
-    autogenDir :: FilePath
-    autogenDir = normalise (getAutogenDir Cabal cabalDir)
-    autogenDirStack :: FilePath
-    autogenDirStack = normalise (getAutogenDir Stack cabalDir)
 
 dumpCabalConfiguration :: FilePath -> IO ()
 dumpCabalConfiguration cabalFile = do
@@ -240,7 +271,7 @@ dumpCabalConfiguration cabalFile = do
 #endif
     case getConcretePackageDescription genericDesc of
         Left e        -> putStrLn $ "Issue with package configuration\n" ++ show e
-        Right pkgDesc -> print (dumpPackageDescription pkgDesc cabalFile)
+        Right pkgDesc -> print =<< dumpPackageDescription pkgDesc cabalFile
 
 getConcretePackageDescription
     :: GenericPackageDescription
@@ -252,7 +283,7 @@ getConcretePackageDescription genericDesc = do
             { testsRequested      = True
             , benchmarksRequested = True
             }
-    fst Control.Applicative.<$> finalizePD
+    fst A.<$> finalizePD
         []           -- Flag assignment
         enabled      -- Enable all components
         (const True) -- Whether given dependency is available
@@ -277,7 +308,7 @@ getConcretePackageDescription genericDesc = do
             { condTestSuites = flaggedTests
             , condBenchmarks = flaggedBenchmarks
             }
-    fst Control.Applicative.<$> finalizePackageDescription
+    fst A.<$> finalizePackageDescription
         []
         (const True)
         buildPlatform
@@ -330,6 +361,32 @@ ordNub = go S.empty
     go acc (x:xs)
         | S.member x acc = go acc xs
         | otherwise      = x : go (S.insert x acc) xs
+
+stripWhitespace :: String -> String
+stripWhitespace = reverse . dropWhile isSpace . reverse . dropWhile isSpace
+
+newtype WriterT w m a = WriterT { runWriterT :: m (a, w) }
+
+tell :: (Monad m, Monoid w) => w -> WriterT w m ()
+tell w = WriterT $ return ((), w)
+
+instance Functor m => Functor (WriterT w m) where
+  fmap f (WriterT x) = WriterT (fmap (first f) x)
+
+instance (A.Applicative m, Monoid w) => A.Applicative (WriterT w m) where
+  pure x = WriterT $ A.pure (x, mempty)
+  WriterT f <*> WriterT x =
+    WriterT $ (\(f', w1) (x', w2) -> (f' x', w1 `mappend` w2)) A.<$> f A.<*> x
+
+instance (Monad m, Monoid w) => Monad (WriterT w m) where
+  return x = WriterT $ return (x, mempty)
+  WriterT x >>= mf = WriterT $ do
+    (x', w)   <- x
+    (x'', w') <- runWriterT (mf x')
+    return (x'', w `mappend` w')
+
+liftWriterT :: (Functor m, Monoid w) => m a -> WriterT w m a
+liftWriterT action = WriterT $ fmap (\x -> (x, mempty)) action
 
 main :: IO ()
 main = do
