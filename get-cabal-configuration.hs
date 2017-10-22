@@ -36,11 +36,10 @@ module Main (main) where
 #endif
 
 import qualified Control.Applicative as A
-import Control.Arrow (first)
+import Control.Exception (SomeException, try)
 import Data.Char (isSpace)
 import Data.List (isPrefixOf, nub)
 import Data.Maybe (listToMaybe)
-import Data.Monoid (Monoid(..))
 import Data.Set (Set)
 import qualified Data.Set as S
 #ifdef USE_COMPILER_ID
@@ -136,20 +135,15 @@ instance ToSexp Sexp where
 cons :: (ToSexp a, ToSexp b) => a -> [b] -> Sexp
 cons h t = SList (toSexp h : map toSexp t)
 
--- | Get possible dist directories
-distDir :: TargetTool -> WriterT [Warning] IO FilePath
+-- | Get possible dist directory
+distDir :: TargetTool -> IO FilePath
 distDir Cabal = return defaultDistPref
 distDir Stack = do
-    -- TODO: find out which version of 'process' package has this function
-    (exitCode, stdOut, stdErr) <-
-        liftWriterT $ readProcessWithExitCode "stack" ["path", "--dist-dir"] []
-    case exitCode of
-        ExitSuccess -> do
-            let distDirectory = stripWhitespace stdOut
-            return distDirectory
-        ExitFailure _ -> do
-            tell [FailedToGetBuildDirFromStack stdErr]
-            return defaultDistDir
+    res <- try $ readProcessWithExitCode "stack" ["path", "--dist-dir"] []
+    return $ case res of
+        Left (_ :: SomeException)      -> defaultDistDir
+        Right (ExitSuccess, stdOut, _) -> stripWhitespace stdOut
+        Right (ExitFailure _, _, _)    -> defaultDistDir
   where
     defaultDistDir :: FilePath
     defaultDistDir =
@@ -161,7 +155,7 @@ getBuildDirectories
     :: TargetTool
     -> PackageDescription
     -> FilePath
-    -> WriterT [Warning] IO ([FilePath], FilePath)
+    -> IO ([FilePath], FilePath)
 getBuildDirectories tool pkgDesc cabalDir = do
     distDir' <- distDir tool
     let buildDir :: FilePath
@@ -211,20 +205,12 @@ isAllowedOption :: String -> Bool
 isAllowedOption opt =
     S.member opt allowedOptions || any (`isPrefixOf` opt) allowedOptionPrefixes
 
--- | Warning that may be produced during configuration.
-data Warning =
-    FailedToGetBuildDirFromStack String -- ^ Stack's stderr.
-
-instance ToSexp Warning where
-    toSexp (FailedToGetBuildDirFromStack stdErr) =
-        toSexp $ "Failed to get build directory from stack:\n" ++ stdErr
-
 dumpPackageDescription :: PackageDescription -> FilePath -> IO Sexp
 dumpPackageDescription pkgDesc cabalFile = do
-    ((buildDirs, autogenDirs), warnings) <- runWriterT $ do
-        (cabalDirs, autogenDir)  <- getBuildDirectories Cabal pkgDesc cabalDir
-        (stackDirs, autogenDir') <- getBuildDirectories Stack pkgDesc cabalDir
-        return (cabalDirs ++ stackDirs, [autogenDir, autogenDir'])
+    (cabalDirs, autogenDir)  <- getBuildDirectories Cabal pkgDesc cabalDir
+    (stackDirs, autogenDir') <- getBuildDirectories Stack pkgDesc cabalDir
+    let buildDirs   = cabalDirs ++ stackDirs
+        autogenDirs = [autogenDir, autogenDir']
     return $
         SList
             [ cons (sym "build-directories") (ordNub (map normalise buildDirs))
@@ -234,7 +220,6 @@ dumpPackageDescription pkgDesc cabalFile = do
             , cons (sym "dependencies") deps
             , cons (sym "other-options") (cppOpts ++ ghcOpts)
             , cons (sym "autogen-directories") (map normalise autogenDirs)
-            , cons (sym "warnings") warnings
             ]
   where
     cabalDir :: FilePath
@@ -364,29 +349,6 @@ ordNub = go S.empty
 
 stripWhitespace :: String -> String
 stripWhitespace = reverse . dropWhile isSpace . reverse . dropWhile isSpace
-
-newtype WriterT w m a = WriterT { runWriterT :: m (a, w) }
-
-tell :: (Monad m, Monoid w) => w -> WriterT w m ()
-tell w = WriterT $ return ((), w)
-
-instance Functor m => Functor (WriterT w m) where
-  fmap f (WriterT x) = WriterT (fmap (first f) x)
-
-instance (A.Applicative m, Monoid w) => A.Applicative (WriterT w m) where
-  pure x = WriterT $ A.pure (x, mempty)
-  WriterT f <*> WriterT x =
-    WriterT $ (\(f', w1) (x', w2) -> (f' x', w1 `mappend` w2)) A.<$> f A.<*> x
-
-instance (Monad m, Monoid w) => Monad (WriterT w m) where
-  return x = WriterT $ return (x, mempty)
-  WriterT x >>= mf = WriterT $ do
-    (x', w)   <- x
-    (x'', w') <- runWriterT (mf x')
-    return (x'', w `mappend` w')
-
-liftWriterT :: (Functor m, Monoid w) => m a -> WriterT w m a
-liftWriterT action = WriterT $ fmap (\x -> (x, mempty)) action
 
 main :: IO ()
 main = do

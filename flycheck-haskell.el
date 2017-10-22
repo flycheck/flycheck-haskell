@@ -245,9 +245,6 @@ buffer."
 (defun flycheck-haskell-process-configuration (config)
   "Process the a Cabal CONFIG."
   (let-alist config
-    (when .warnings
-      (message "Warnings during configuration:\n%s"
-               (mapconcat #'identity .warnings "\n")))
     (setq-local flycheck-ghc-search-path
                 (append .build-directories .source-directories
                         flycheck-ghc-search-path))
