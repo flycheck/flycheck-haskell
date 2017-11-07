@@ -43,6 +43,11 @@
 ;; Haskell syntax checkers in Flycheck to use the package database from the
 ;; Sandbox.
 
+;;;; Stack support
+
+;; Try to find a stack.yaml file for current project and configure stack projct
+;; according to the Stack project settings.
+
 ;;;; Setup
 
 ;; (add-hook 'flycheck-mode-hook #'flycheck-haskell-setup)
@@ -122,6 +127,11 @@ Take the base command from `flycheck-haskell-runghc-command'."
         (retcode (message "Reading Haskell configuration failed with exit code %s and output:\n%s"
                           retcode (buffer-string))
                  nil)))))
+
+(defun flycheck-haskell--delete-dups (xs)
+  "Remove duplicates from a list XS using `equal'. Leaves initial
+list unchanged."
+  (copy-sequence (delete-dups xs)))
 
 
 ;;; Cabal configuration caching
@@ -246,24 +256,28 @@ buffer."
   "Process the a Cabal CONFIG."
   (let-alist config
     (setq-local flycheck-ghc-search-path
-                (append .build-directories .source-directories
-                        flycheck-ghc-search-path))
+                (flycheck-haskell--delete-dups
+                 (append .build-directories .source-directories
+                         flycheck-ghc-search-path)))
     (setq-local flycheck-ghc-language-extensions
-                (append .extensions .languages
-                        flycheck-ghc-language-extensions))
+                (flycheck-haskell--delete-dups
+                 (append .extensions .languages
+                         flycheck-ghc-language-extensions)))
     (setq-local flycheck-ghc-args
-                (append .other-options
-                        (seq-map (apply-partially #'concat "-I")
-                                 .autogen-directories)
-                        '("-optP-include" "-optPcabal_macros.h")
-                        (cons "-hide-all-packages"
-                              (seq-mapcat (apply-partially #'list "-package")
-                                          .dependencies))
-                        flycheck-ghc-args))
+                (flycheck-haskell--delete-dups
+                 (append .other-options
+                         (seq-map (apply-partially #'concat "-I")
+                                  .autogen-directories)
+                         '("-optP-include" "-optPcabal_macros.h")
+                         (cons "-hide-all-packages"
+                               (seq-map (apply-partially #'concat "-package=")
+                                        .dependencies))
+                         flycheck-ghc-args)))
     (setq-local flycheck-hlint-args
-                (append (seq-mapcat (apply-partially #'list "--cpp-include")
-                                    .autogen-directories)
-                        '("--cpp-file" "cabal_macros.h")))))
+                (flycheck-haskell--delete-dups
+                 (append (seq-map (apply-partially #'concat "--cpp-include=")
+                                  .autogen-directories)
+                         '("--cpp-file=cabal_macros.h"))))))
 
 (defun flycheck-haskell-configure ()
   "Set paths and package database for the current project."
@@ -280,7 +294,8 @@ buffer."
     (let-alist (flycheck-haskell-get-sandbox-config)
       (when .package-db
         (setq-local flycheck-ghc-package-databases
-                    (cons .package-db flycheck-ghc-package-databases))
+                    (flycheck-haskell--delete-dups
+                     (cons .package-db flycheck-ghc-package-databases)))
         (setq-local flycheck-ghc-no-user-package-database t)))))
 
 ;;;###autoload
@@ -293,6 +308,7 @@ account.
 
 Also search for Cabal sandboxes and add them to the module search
 path as well."
+  (flycheck-haskell-configure)
   (add-hook 'hack-local-variables-hook #'flycheck-haskell-configure))
 
 (provide 'flycheck-haskell)

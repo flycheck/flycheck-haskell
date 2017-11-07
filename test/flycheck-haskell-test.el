@@ -279,10 +279,8 @@ using directory separator."
 (ert-deftest flycheck-haskell-process-configuration/includes-dependenty-packages ()
   (with-temp-buffer
     (flycheck-haskell-process-configuration (flycheck-haskell-read-test-config))
-    (should (cl-search '("-package" "bytestring") flycheck-ghc-args
-                       :test #'equal))
-    (should (cl-search '("-package" "base") flycheck-ghc-args
-                       :test #'equal))
+    (should (member "-package=bytestring" flycheck-ghc-args))
+    (should (member "-package=base" flycheck-ghc-args))
     (should (local-variable-p 'flycheck-ghc-args))))
 
 (ert-deftest flycheck-haskell-configure/ghc-executable ()
