@@ -308,6 +308,7 @@ account.
 
 Also search for Cabal sandboxes and add them to the module search
 path as well."
+  (flycheck-haskell-configure)
   (add-hook 'hack-local-variables-hook #'flycheck-haskell-configure))
 
 (provide 'flycheck-haskell)
