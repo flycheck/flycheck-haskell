@@ -80,12 +80,14 @@ import Distribution.Types.ComponentRequestedSpec (ComponentRequestedSpec(..))
 import Distribution.PackageDescription.Parse (readGenericPackageDescription)
 import Distribution.Types.UnqualComponentName (unUnqualComponentName)
 import qualified Distribution.Version as CabalVersion
+import Distribution.Types.Benchmark (Benchmark(benchmarkName))
+import Distribution.Types.TestSuite (TestSuite(testName))
 #else
 import Control.Arrow (second)
 import Data.Version (showVersion)
 import Distribution.Package (PackageName(..))
 import Distribution.PackageDescription
-       (TestSuite, Benchmark, condTestSuites, condBenchmarks,
+       (TestSuite(..), Benchmark(..), condTestSuites, condBenchmarks,
         benchmarkEnabled, testEnabled)
 import Distribution.PackageDescription.Configuration
        (finalizePackageDescription, mapTreeData)
@@ -158,14 +160,22 @@ getBuildDirectories
     -> IO ([FilePath], FilePath)
 getBuildDirectories tool pkgDesc cabalDir = do
     distDir' <- distDir tool
-    let buildDir :: FilePath
+    let buildDir   :: FilePath
         buildDir   = cabalDir </> distDir' </> "build"
+        -- 'dist/bulid/autogen' OR '.stack-work/dist/x86_64-linux/Cabal-1.24.2.0/build/autogen/'
         autogenDir :: FilePath
         autogenDir = buildDir </> "autogen"
-        executableBuildDir :: Executable -> FilePath
-        executableBuildDir e = buildDir </> getExeName e </> (getExeName e ++ "-tmp")
+
+        componentBuildDir :: (a -> String) -> a -> FilePath
+        componentBuildDir componentName component =
+            buildDir </> componentName component </> (componentName component ++ "-tmp")
+
         buildDirs :: [FilePath]
-        buildDirs = autogenDir : map executableBuildDir (executables pkgDesc)
+        buildDirs =
+            autogenDir :
+            map (componentBuildDir getExeName) (executables pkgDesc) ++
+            map (componentBuildDir getTestName) (testSuites pkgDesc) ++
+            map (componentBuildDir getBenchName) (benchmarks pkgDesc)
 
         buildDirs' = case library pkgDesc of
             Just _  -> buildDir : buildDirs
@@ -328,6 +338,23 @@ getExeName =
 #else
     exeName
 #endif
+
+getTestName :: TestSuite -> FilePath
+getTestName =
+#if Cabal2
+    unUnqualComponentName . testName
+#else
+    testName
+#endif
+
+getBenchName :: Benchmark -> FilePath
+getBenchName =
+#if Cabal2
+    unUnqualComponentName . benchmarkName
+#else
+    benchmarkName
+#endif
+
 
 -- Textual representation of cabal version
 cabalVersion' :: String
