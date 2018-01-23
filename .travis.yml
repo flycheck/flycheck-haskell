@@ -11,6 +11,9 @@ env:
     # GHC 8.0
     - EMACS_VERSION=24.3 STACK_YAML=stack-8.0.yaml
     - EMACS_VERSION=24.5 STACK_YAML=stack-8.0.yaml
+    # GHC 8.2
+    - EMACS_VERSION=24.3 STACK_YAML=stack-8.0.yaml
+    - EMACS_VERSION=24.5 STACK_YAML=stack-8.0.yaml
 before_install:
   - export PATH="$HOME/bin:$HOME/.local/bin::$PATH"
   - export STACK_YAML="${TRAVIS_BUILD_DIR}/${STACK_YAML}"
