@@ -1,42 +1,88 @@
-language: haskell
+
+language: generic
+
+# Explicitly request container-based infrastructure.
 sudo: false
-env:
-  matrix:
-    # GHC 7.8
-    - EMACS_VERSION=24.3 STACK_YAML=stack-7.8.yaml
-    - EMACS_VERSION=24.5 STACK_YAML=stack-7.8.yaml
-    # GHC 7.10
-    - EMACS_VERSION=24.3 STACK_YAML=stack-7.10.yaml
-    - EMACS_VERSION=24.5 STACK_YAML=stack-7.10.yaml
-    # GHC 8.0
-    - EMACS_VERSION=24.3 STACK_YAML=stack-8.0.yaml
-    - EMACS_VERSION=24.5 STACK_YAML=stack-8.0.yaml
+
+matrix:
+  allow_failures:
+     - env: GHC=head EVM_EMACS=emacs-24.4-travis
+     - env: GHC=head EVM_EMACS=emacs-25.3-travis
+
+  include:
+    - env: GHC=7.8.4 EVM_EMACS=emacs-24.4-travis
+      compiler: ": GHC 7.8.4, EMACS 24.4"
+      addons: {apt: {packages: [ghc-7.8.4], sources: [hvr-ghc]}}
+
+    - env: GHC=7.8.4 EVM_EMACS=emacs-25.3-travis
+      compiler: ": GHC 7.8.4, EMACS 25.3"
+      addons: {apt: {packages: [ghc-7.8.4], sources: [hvr-ghc]}}
+
+
+    - env: GHC=7.10.3 EVM_EMACS=emacs-24.4-travis
+      compiler: ": GHC 7.10.3, EMACS 24.4"
+      addons: {apt: {packages: [ghc-7.10.3], sources: [hvr-ghc]}}
+
+    - env: GHC=7.10.3 EVM_EMACS=emacs-25.3-travis
+      compiler: ": GHC 7.10.3, EMACS 25.3"
+      addons: {apt: {packages: [ghc-7.10.3], sources: [hvr-ghc]}}
+
+
+    - env: GHC=8.0.2 EVM_EMACS=emacs-24.4-travis
+      compiler: ": GHC 8.0.2, EMACS 24.4"
+      addons: {apt: {packages: [ghc-8.0.2], sources: [hvr-ghc]}}
+
+    - env: GHC=8.0.2 EVM_EMACS=emacs-25.3-travis
+      compiler: ": GHC 8.0.2, EMACS 25.3"
+      addons: {apt: {packages: [ghc-8.0.2], sources: [hvr-ghc]}}
+
+
+    - env: GHC=8.2.2 EVM_EMACS=emacs-24.4-travis
+      compiler: ": GHC 8.2.2, EMACS 24.4"
+      addons: {apt: {packages: [ghc-8.2.2], sources: [hvr-ghc]}}
+
+    - env: GHC=8.2.2 EVM_EMACS=emacs-25.3-travis
+      compiler: ": GHC 8.2.2, EMACS 25.3"
+      addons: {apt: {packages: [ghc-8.2.2], sources: [hvr-ghc]}}
+
+
+    - env: GHC=head EVM_EMACS=emacs-24.4-travis
+      compiler: ": GHC HEAD, EMACS 24.4"
+      addons: {apt: {packages: [ghc-head], sources: [hvr-ghc]}}
+
+    - env: GHC=head EVM_EMACS=emacs-25.3-travis
+      compiler: ": GHC HEAD, EMACS 25.3"
+      addons: {apt: {packages: [ghc-head], sources: [hvr-ghc]}}
+
+install: true
+
 before_install:
-  - export PATH="$HOME/bin:$HOME/.local/bin::$PATH"
-  - export STACK_YAML="${TRAVIS_BUILD_DIR}/${STACK_YAML}"
-  # Install Emacs (according to $EMACS_VERSION) and Cask
-  - travis_retry wget 'https://raw.githubusercontent.com/flycheck/emacs-travis/master/emacs-travis.mk'
-  - make -f emacs-travis.mk install_emacs
-  - make -f emacs-travis.mk install_cask
-  - emacs --version
-  # Install stack
-  - mkdir -p "$HOME/.local/bin"
-  - travis_retry curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C "$HOME/.local/bin" '*/stack'
-  - stack --version
+
+  # Using compiler above sets CC to an invalid value, so unset it
+  - unset CC
+
+  - export PATH="/opt/ghc/$GHCVER/bin:$PATH"
+
+   # ????
+  - mkdir -p ~/.local/bin
+
+  - |
+    if [ -n "$EVM_EMACS" ]; then
+      git clone https://github.com/rejeep/evm.git $HOME/.evm
+      export PATH="$HOME/.evm/bin:$PATH"
+      evm config path /tmp
+      evm install "$EVM_EMACS" --use --skip
+      # Use cask to install elisp dependencies
+      git clone https://github.com/cask/cask.git "$HOME/.cask"
+      export PATH="$HOME/.cask/bin:$PATH"
+    fi
+
 install:
-  # Setup stack
-  - stack setup
-  - stack ghc -- --version
-  - stack runghc -- --version
-  # Install Emacs Lisp dependencies
-  - cask install
+  - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
+  - echo "$(ghc-pkg list)"
+
 script:
   - make compile
   # FIXME: Restore hlint as soon as we find a simple way to install it on Travis CI
   # - make HLINTFLAGS=-c lint
   - make test
-cache:
-  directories:
-    - ".stack-work/"
-    - "$HOME/.stack/"
-    - "$HOME/.local/bin"

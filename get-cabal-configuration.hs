@@ -74,18 +74,22 @@ import Data.Version (Version)
 #endif
 
 #if Cabal2
+import Control.Monad (filterM)
 import Distribution.Package (unPackageName, depPkgName, PackageName)
 import Distribution.PackageDescription.Configuration (finalizePD)
 import Distribution.Types.ComponentRequestedSpec (ComponentRequestedSpec(..))
 import Distribution.PackageDescription.Parse (readGenericPackageDescription)
 import Distribution.Types.UnqualComponentName (unUnqualComponentName)
 import qualified Distribution.Version as CabalVersion
+import Distribution.Types.Benchmark (Benchmark(benchmarkName))
+import Distribution.Types.TestSuite (TestSuite(testName))
+import System.Directory (doesDirectoryExist)
 #else
 import Control.Arrow (second)
 import Data.Version (showVersion)
 import Distribution.Package (PackageName(..))
 import Distribution.PackageDescription
-       (TestSuite, Benchmark, condTestSuites, condBenchmarks,
+       (TestSuite(..), Benchmark(..), condTestSuites, condBenchmarks,
         benchmarkEnabled, testEnabled)
 import Distribution.PackageDescription.Configuration
        (finalizePackageDescription, mapTreeData)
@@ -155,22 +159,48 @@ getBuildDirectories
     :: TargetTool
     -> PackageDescription
     -> FilePath
-    -> IO ([FilePath], FilePath)
+    -> IO ([FilePath], [FilePath])
 getBuildDirectories tool pkgDesc cabalDir = do
     distDir' <- distDir tool
-    let buildDir :: FilePath
+    let buildDir   :: FilePath
         buildDir   = cabalDir </> distDir' </> "build"
-        autogenDir :: FilePath
-        autogenDir = buildDir </> "autogen"
-        executableBuildDir :: Executable -> FilePath
-        executableBuildDir e = buildDir </> getExeName e </> (getExeName e ++ "-tmp")
+
+        componentNames :: [String]
+        componentNames =
+            map getExeName   (executables pkgDesc) ++
+            map getTestName  (testSuites pkgDesc) ++
+            map getBenchName (benchmarks pkgDesc)
+
+
+    autogenDirs <- getAutogenDirs buildDir componentNames
+
+    let componentBuildDir :: String -> FilePath
+        componentBuildDir componentName =
+            buildDir </> componentName </> (componentName ++ "-tmp")
+
         buildDirs :: [FilePath]
-        buildDirs = autogenDir : map executableBuildDir (executables pkgDesc)
+        buildDirs =
+            autogenDirs ++
+            map componentBuildDir componentNames
 
         buildDirs' = case library pkgDesc of
             Just _  -> buildDir : buildDirs
             Nothing -> buildDirs
-    return (buildDirs', autogenDir)
+    return (buildDirs', autogenDirs)
+
+getAutogenDirs :: FilePath -> [String] -> IO [FilePath]
+getAutogenDirs buildDir componentNames =
+    fmap (autogenDir :) $
+#if Cabal2
+        filterM doesDirectoryExist $
+            map (\path -> buildDir </> path </> "autogen") componentNames
+#else
+        const (return []) componentNames
+#endif
+  where
+    -- 'dist/bulid/autogen' OR '.stack-work/dist/x86_64-linux/Cabal-1.24.2.0/build/autogen'
+    autogenDir :: FilePath
+    autogenDir = buildDir </> "autogen"
 
 getSourceDirectories :: [BuildInfo] -> FilePath -> [String]
 getSourceDirectories buildInfo cabalDir =
@@ -207,10 +237,10 @@ isAllowedOption opt =
 
 dumpPackageDescription :: PackageDescription -> FilePath -> IO Sexp
 dumpPackageDescription pkgDesc cabalFile = do
-    (cabalDirs, autogenDir)  <- getBuildDirectories Cabal pkgDesc cabalDir
-    (stackDirs, autogenDir') <- getBuildDirectories Stack pkgDesc cabalDir
+    (cabalDirs, cabalAutogen) <- getBuildDirectories Cabal pkgDesc cabalDir
+    (stackDirs, stackAutogen) <- getBuildDirectories Stack pkgDesc cabalDir
     let buildDirs   = cabalDirs ++ stackDirs
-        autogenDirs = [autogenDir, autogenDir']
+        autogenDirs = cabalAutogen ++ stackAutogen
     return $
         SList
             [ cons (sym "build-directories") (ordNub (map normalise buildDirs))
@@ -328,6 +358,23 @@ getExeName =
 #else
     exeName
 #endif
+
+getTestName :: TestSuite -> FilePath
+getTestName =
+#if Cabal2
+    unUnqualComponentName . testName
+#else
+    testName
+#endif
+
+getBenchName :: Benchmark -> FilePath
+getBenchName =
+#if Cabal2
+    unUnqualComponentName . benchmarkName
+#else
+    benchmarkName
+#endif
+
 
 -- Textual representation of cabal version
 cabalVersion' :: String
