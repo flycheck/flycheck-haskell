@@ -73,9 +73,9 @@
   :link '(url-link :tag "Github" "https://github.com/flycheck/flycheck-haskell"))
 
 (defcustom flycheck-haskell-runghc-command
-  (if (executable-find "stack")
+  (if (funcall flycheck-executable-find "stack")
       '("stack" "--verbosity" "silent" "runghc" "--no-ghc-package-path" "--" "--ghc-arg=-i")
-    '("runghc" "-i"))
+    `(,(funcall flycheck-executable-find "runghc") "-i"))
   "Command for `runghc'.
 
 This library uses `runghc' to run various Haskell helper scripts
