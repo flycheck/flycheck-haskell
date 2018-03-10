@@ -1,5 +1,6 @@
 ;;; flycheck-haskell-test.el --- Flycheck Haskell: Test suite  -*- lexical-binding: t; -*-
 
+;; Copyright (C) 2018 Sergey Vinokurov <serg.foo@gmail.com>
 ;; Copyright (C) 2014, 2015  Sebastian Wiesner <swiesner@lunaryorn.com>
 
 ;; Author: Sebastian Wiesner <swiesner@lunaryorn.com>

@@ -1,3 +1,4 @@
+-- Copyright (C) 2016-2018 Sergey Vinokurov <serg.foo@gmail.com>
 -- Copyright (C) 2014-2016 Sebastian Wiesner <swiesner@lunaryorn.com>
 -- Copyright (C) 2016 Danny Navarro
 -- Copyright (C) 2015 Mark Karpov <markkarpov@opmbx.org>
