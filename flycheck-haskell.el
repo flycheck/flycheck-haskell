@@ -119,7 +119,7 @@ Take the base command from `flycheck-haskell-runghc-command'."
 (defun flycheck-haskell-read-cabal-configuration (cabal-file)
   "Read the Cabal configuration from CABAL-FILE."
   (let* ((args (append (flycheck-haskell--get-flags)
-                       (list flycheck-haskell-helper cabal-file)))
+                       (list flycheck-haskell-helper "--cabal-file" cabal-file)))
          (command (flycheck-haskell-runghc-command args)))
     (with-temp-buffer
       (pcase (apply 'call-process (car command) nil t nil (cdr command))

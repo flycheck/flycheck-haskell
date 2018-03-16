@@ -22,25 +22,35 @@
 
 {-# LANGUAGE CPP                  #-}
 {-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE NamedFieldPuns       #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 
 module Main (main) where
 
 #if __GLASGOW_HASKELL__ >= 800
-#define Cabal2 MIN_VERSION_Cabal(2,0,0)
+# if MIN_VERSION_Cabal(2,2,0)
+#  define Cabal22 1
+# elif MIN_VERSION_Cabal(2,0,0)
+#  define Cabal20 1
+# endif
 #else
 -- Hack - we may actually be using Cabal 2.0 with e.g. 7.8 GHC. But
 -- that's not likely to occur for average user who's relying on
 -- packages bundled with GHC. The 2.0 Cabal is bundled starting with 8.2.1.
-#define Cabal2 0
+#undef Cabal22
+#undef Cabal20
 #endif
 
 import qualified Control.Applicative as A
 import Control.Exception (SomeException, try)
+import Control.Monad (when)
+#if defined(Cabal22)
+import qualified Data.ByteString as BS
+#endif
 import Data.Char (isSpace)
-import Data.List (isPrefixOf, nub)
-import Data.Maybe (listToMaybe)
+import Data.Functor.Identity
+import Data.List (isPrefixOf, nub, foldl')
 import Data.Set (Set)
 import qualified Data.Set as S
 #ifdef USE_COMPILER_ID
@@ -64,22 +74,24 @@ import Distribution.System (buildPlatform)
 import Distribution.Text (display)
 import Distribution.Verbosity (silent)
 import Language.Haskell.Extension (Extension(..),Language(..))
+import System.Console.GetOpt
 import System.Environment (getArgs)
-import System.Exit (ExitCode(..), exitFailure)
+import System.Exit (ExitCode(..), exitFailure, exitSuccess)
 import System.FilePath ((</>),dropFileName,normalise)
 import System.Info (compilerVersion)
+import System.IO (Handle, hGetContents, hPutStrLn, stderr)
 import System.Process (readProcessWithExitCode)
+import qualified System.Process as Process
 
-#if __GLASGOW_HASKELL__ >= 710 && !Cabal2
+#if __GLASGOW_HASKELL__ >= 710 && !defined(Cabal20) && !defined(Cabal22)
 import Data.Version (Version)
 #endif
 
-#if Cabal2
+#if defined(Cabal20) || defined(Cabal22)
 import Control.Monad (filterM)
 import Distribution.Package (unPackageName, depPkgName, PackageName)
 import Distribution.PackageDescription.Configuration (finalizePD)
 import Distribution.Types.ComponentRequestedSpec (ComponentRequestedSpec(..))
-import Distribution.PackageDescription.Parse (readGenericPackageDescription)
 import Distribution.Types.UnqualComponentName (unUnqualComponentName)
 import qualified Distribution.Version as CabalVersion
 import Distribution.Types.Benchmark (Benchmark(benchmarkName))
@@ -94,7 +106,25 @@ import Distribution.PackageDescription
         benchmarkEnabled, testEnabled)
 import Distribution.PackageDescription.Configuration
        (finalizePackageDescription, mapTreeData)
-import Distribution.PackageDescription.Parse (readPackageDescription)
+#endif
+
+#if defined(Cabal22)
+import Distribution.Pretty (prettyShow)
+import Distribution.Types.GenericPackageDescription (mkFlagAssignment)
+#endif
+
+#if defined(Cabal22)
+import Distribution.PackageDescription.Parsec
+       (runParseResult, readGenericPackageDescription, parseGenericPackageDescription)
+import Distribution.Parsec.Common (showPError)
+#elif defined(Cabal20)
+import Distribution.PackageDescription.Parse
+       (ParseResult(..), readGenericPackageDescription, parseGenericPackageDescription)
+import Distribution.ParseUtils (locatedErrorMsg)
+#else
+import Distribution.PackageDescription.Parse
+       (ParseResult(..), parsePackageDescription, readPackageDescription)
+import Distribution.ParseUtils (locatedErrorMsg)
 #endif
 
 data Sexp
@@ -128,7 +158,7 @@ instance ToSexp Language where
     toSexp lang = toSexp (show lang)
 
 instance ToSexp Dependency where
-#if Cabal2
+#if defined(Cabal20) || defined(Cabal22)
     toSexp = toSexp . unPackageName . depPkgName
 #else
     toSexp (Dependency (PackageName dependency) _) = toSexp dependency
@@ -172,7 +202,6 @@ getBuildDirectories tool pkgDesc cabalDir = do
             map getTestName  (testSuites pkgDesc) ++
             map getBenchName (benchmarks pkgDesc)
 
-
     autogenDirs <- getAutogenDirs buildDir componentNames
 
     let componentBuildDir :: String -> FilePath
@@ -191,13 +220,7 @@ getBuildDirectories tool pkgDesc cabalDir = do
 
 getAutogenDirs :: FilePath -> [String] -> IO [FilePath]
 getAutogenDirs buildDir componentNames =
-    fmap (autogenDir :) $
-#if Cabal2
-        filterM doesDirectoryExist $
-            map (\path -> buildDir </> path </> "autogen") componentNames
-#else
-        const (return []) componentNames
-#endif
+    fmap (autogenDir :) $ componentsAutogenDirs buildDir componentNames
   where
     -- 'dist/bulid/autogen' OR '.stack-work/dist/x86_64-linux/Cabal-1.24.2.0/build/autogen'
     autogenDir :: FilePath
@@ -216,7 +239,8 @@ allowedOptions = S.fromList
     , "-fpackage-trust"
     , "-fhelpful-errors"
     , "-F"
-    , "-cpp"]
+    , "-cpp"
+    ]
 
 allowedOptionPrefixes :: [String]
 allowedOptionPrefixes =
@@ -230,7 +254,8 @@ allowedOptionPrefixes =
     , "-fplugin="
     , "-fplugin-opt="
     , "-pgm"
-    , "-opt"]
+    , "-opt"
+    ]
 
 isAllowedOption :: String -> Bool
 isAllowedOption opt =
@@ -275,25 +300,109 @@ dumpPackageDescription pkgDesc projectDir = do
     ghcOpts =
         ordNub (filter isAllowedOption (concatMap (hcOptions GHC) buildInfo))
 
-dumpCabalConfiguration :: FilePath -> IO ()
-dumpCabalConfiguration configFile = do
+getCabalConfiguration :: HPackExe -> ConfigurationFile -> IO Sexp
+getCabalConfiguration hpackExe configFile = do
     genericDesc <-
-#if Cabal2
-        readGenericPackageDescription silent configFile
-#else
-        readPackageDescription silent configFile
-#endif
+        case configFile of
+            HPackFile path -> readHPackPkgDescr hpackExe path projectDir
+            CabalFile path -> readGenericPkgDescr path
     case getConcretePackageDescription genericDesc of
-        Left e        -> do
-            putStrLn $ "Issue with package configuration\n" ++ show e
-            exitFailure
-        Right pkgDesc -> print =<< dumpPackageDescription pkgDesc (dropFileName configFile)
+        Left e        -> die' $ "Issue with package configuration\n" ++ show e
+        Right pkgDesc -> dumpPackageDescription pkgDesc projectDir
+  where
+    projectDir :: FilePath
+    projectDir = dropFileName $ configFilePath configFile
+
+readHPackPkgDescr :: HPackExe -> FilePath -> FilePath -> IO GenericPackageDescription
+readHPackPkgDescr exe configFile projectDir = do
+    (Nothing, Just out, Just err, procHandle) <- Process.createProcess p
+    cabalFileContents <- readCabalFileContentsFromHandle out
+    exitCode <- Process.waitForProcess procHandle
+    case exitCode of
+        ExitFailure{} -> do
+            err' <- hGetContents err
+            die' $ "Failed to obtain cabal configuration by running hpack on '" ++ configFile ++ "':\n" ++ err'
+        ExitSuccess ->
+            case parsePkgDescr "<generated by hpack>" cabalFileContents of
+                Left msgs ->
+                    die' $ "Failed to parse cabal file produced by hpack from '" ++ configFile ++ "':\n" ++
+                        unlines msgs
+                Right x   -> return x
+  where
+    p = (Process.proc (unHPackExe exe) [configFile, "-"])
+        { Process.std_in  = Process.Inherit
+        , Process.std_out = Process.CreatePipe
+        , Process.std_err = Process.CreatePipe
+        , Process.cwd     = Just projectDir
+        }
+
+readGenericPkgDescr :: FilePath -> IO GenericPackageDescription
+readGenericPkgDescr configFile =
+#if defined(Cabal20) || defined(Cabal22)
+    readGenericPackageDescription silent configFile
+#else
+    readPackageDescription silent configFile
+#endif
+
+newtype CabalFileContents = CabalFileContents
+    { unCabalFileContents ::
+#if defined(Cabal22)
+        BS.ByteString
+#else
+        String
+#endif
+    }
+
+readCabalFileContentsFromHandle :: Handle -> IO CabalFileContents
+readCabalFileContentsFromHandle =
+    fmap CabalFileContents .
+#if defined(Cabal22)
+        BS.hGetContents
+#else
+        hGetContents
+#endif
+
+parsePkgDescr :: FilePath -> CabalFileContents -> Either [String] GenericPackageDescription
+parsePkgDescr _fileName cabalFileContents =
+#if defined(Cabal22)
+    case runParseResult $ parseGenericPackageDescription $ unCabalFileContents cabalFileContents of
+        (_warnings, res) ->
+            case res of
+                Left (_version, errs) -> Left $ map (showPError _fileName) errs
+                Right x -> return x
+#elif defined(Cabal20)
+    case parseGenericPackageDescription $ unCabalFileContents cabalFileContents of
+        ParseFailed failure ->
+            let (_line, msg) = locatedErrorMsg failure
+            in Left [msg]
+        ParseOk _warnings x  -> Right x
+#else
+    case parsePackageDescription $ unCabalFileContents cabalFileContents of
+        ParseFailed failure ->
+            let (_line, msg) = locatedErrorMsg failure
+            in Left [msg]
+        ParseOk _warnings x  -> Right x
+#endif
 
 getConcretePackageDescription
     :: GenericPackageDescription
     -> Either [Dependency] PackageDescription
 getConcretePackageDescription genericDesc = do
-#if Cabal2
+#if defined(Cabal22)
+    let enabled :: ComponentRequestedSpec
+        enabled = ComponentRequestedSpec
+            { testsRequested      = True
+            , benchmarksRequested = True
+            }
+    fst A.<$> finalizePD
+        (mkFlagAssignment []) -- Flag assignment
+        enabled               -- Enable all components
+        (const True)          -- Whether given dependency is available
+        buildPlatform
+        buildCompilerId
+        []                    -- Additional constraints
+        genericDesc
+#elif defined(Cabal20)
     let enabled :: ComponentRequestedSpec
         enabled = ComponentRequestedSpec
             { testsRequested      = True
@@ -333,8 +442,16 @@ getConcretePackageDescription genericDesc = do
         genericDesc'
 #endif
 
+componentsAutogenDirs :: FilePath -> [String] -> IO [FilePath]
+#if defined(Cabal20) || defined(Cabal22)
+componentsAutogenDirs buildDir componentNames =
+        filterM doesDirectoryExist $
+            map (\path -> buildDir </> path </> "autogen") componentNames
+#else
+componentsAutogenDirs _ _ = return []
+#endif
 
-#ifdef USE_COMPILER_ID
+#if defined(USE_COMPILER_ID)
 buildCompilerId :: CompilerId
 buildCompilerId = CompilerId buildCompilerFlavor compilerVersion
 #else
@@ -343,7 +460,7 @@ buildCompilerId = unknownCompilerInfo compId NoAbiTag
   where
     compId :: CompilerId
     compId = CompilerId buildCompilerFlavor compVersion
-# if Cabal2
+# if defined(Cabal20) || defined(Cabal22)
     compVersion :: CabalVersion.Version
     compVersion = CabalVersion.mkVersion' compilerVersion
 # else
@@ -354,7 +471,7 @@ buildCompilerId = unknownCompilerInfo compId NoAbiTag
 
 getExeName :: Executable -> FilePath
 getExeName =
-#if Cabal2
+#if defined(Cabal20) || defined(Cabal22)
     unUnqualComponentName . exeName
 #else
     exeName
@@ -362,7 +479,7 @@ getExeName =
 
 getTestName :: TestSuite -> FilePath
 getTestName =
-#if Cabal2
+#if defined(Cabal20) || defined(Cabal22)
     unUnqualComponentName . testName
 #else
     testName
@@ -370,17 +487,18 @@ getTestName =
 
 getBenchName :: Benchmark -> FilePath
 getBenchName =
-#if Cabal2
+#if defined(Cabal20) || defined(Cabal22)
     unUnqualComponentName . benchmarkName
 #else
     benchmarkName
 #endif
 
-
 -- Textual representation of cabal version
 cabalVersion' :: String
 cabalVersion' =
-#if Cabal2
+#if defined(Cabal22)
+    prettyShow cabalVersion
+#elif defined(Cabal20)
     CabalVersion.showVersion cabalVersion
 #else
     showVersion cabalVersion
@@ -398,8 +516,81 @@ ordNub = go S.empty
 stripWhitespace :: String -> String
 stripWhitespace = reverse . dropWhile isSpace . reverse . dropWhile isSpace
 
+die' :: String -> IO a
+die' msg = do
+    hPutStrLn stderr msg
+    exitFailure
+
+data ConfigurationFile =
+      CabalFile FilePath
+    | HPackFile FilePath
+
+configFilePath :: ConfigurationFile -> FilePath
+configFilePath (CabalFile path) = path
+configFilePath (HPackFile path) = path
+
+newtype HPackExe = HPackExe { unHPackExe :: FilePath }
+
+data Config f = Config
+    { cfgInputFile :: f ConfigurationFile
+    , cfgHPackExe  :: HPackExe
+    }
+
+reifyConfig :: Config Maybe -> IO (Config Identity)
+reifyConfig Config{cfgInputFile, cfgHPackExe} = do
+    cfgInputFile' <- case cfgInputFile of
+        Nothing   -> die' $ "Input file not specified. Use --cabal-file or --hpack-file to specify one."
+        Just path -> return path
+    return Config
+        { cfgInputFile = Identity cfgInputFile'
+        , cfgHPackExe
+        }
+
+optionDescr :: [OptDescr (Config Maybe -> Config Maybe)]
+optionDescr =
+    [ Option
+          []
+          ["cabal-file"]
+          (ReqArg (\path cfg -> cfg { cfgInputFile = Just (CabalFile path) }) "FILE")
+          "Cabal file to process"
+    , Option
+          []
+          ["hpack-file"]
+          (ReqArg (\path cfg -> cfg { cfgInputFile = Just (HPackFile path) }) "FILE")
+          "HPack package.yaml file to process"
+    , Option
+          []
+          ["hpack-exe"]
+          (ReqArg (\path cfg -> cfg { cfgHPackExe = HPackExe path }) "FILE")
+          "Path to 'hpack' executable"
+    ]
+
+defaultConfig :: Config Maybe
+defaultConfig = Config
+    { cfgInputFile = Nothing
+    , cfgHPackExe  = HPackExe "hpack"
+    }
+
+main' :: Config Identity -> IO ()
+main' Config{cfgInputFile, cfgHPackExe} =
+    print =<< getCabalConfiguration cfgHPackExe (runIdentity cfgInputFile)
+
 main :: IO ()
 main = do
     args <- getArgs
-    let cabalFile = listToMaybe args
-    maybe exitFailure dumpCabalConfiguration cabalFile
+    when (any (`elem` ["-h", "--help"]) args) $ do
+        putStrLn usage
+        exitSuccess
+    case getOpt' RequireOrder optionDescr args of
+        (fs, [],  [],  []) -> do
+            let cfg = foldl' (flip ($)) defaultConfig fs
+            main' =<< reifyConfig cfg
+        (_,  x:_, [],  []) ->
+            die' $ "Unrecognised argument: " ++ x
+        (_,  [],  y:_, []) ->
+            die' $ "Unrecognised command-line option: " ++ y
+        (_,  _,   _,   es) ->
+            die' $ "Failed to parse command-line options:\n" ++ unlines es
+  where
+    header = "Usage: get-cabal-configuration [OPTION...]"
+    usage = usageInfo header optionDescr
