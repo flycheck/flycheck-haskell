@@ -35,20 +35,39 @@
 
 ;;; Directories
 
+(defun flycheck-haskell--concat-dirs (&rest dirs)
+  "Combine multiple relative directory names into one.
+
+Combine directory names in DIRS into one long directory name
+using directory separator."
+  (cl-reduce
+   #'concat
+   (seq-map #'file-name-as-directory dirs)
+   :initial-value nil))
+
 (defconst flycheck-haskell-test-dir
   (file-name-directory (if load-in-progress load-file-name (buffer-file-name)))
   "Directory of the test suite.")
 
+(defconst flycheck-haskell-default-test-dir
+  (flycheck-haskell--concat-dirs flycheck-haskell-test-dir
+                                 "test-data"
+                                 "project-with-cabal-file")
+  "Directory where tests are run by default.")
+
 (defconst flycheck-haskell-test-cabal-file
-  (expand-file-name "flycheck-haskell-test.cabal" flycheck-haskell-test-dir)
+  (expand-file-name "flycheck-haskell-test.cabal"
+                    flycheck-haskell-default-test-dir)
   "Cabal file for our test suite.")
 
 (defconst flycheck-haskell-test-sandbox-file
-  (expand-file-name "cabal.sandbox.config" flycheck-haskell-test-dir)
+  (expand-file-name "cabal.sandbox.config"
+                    flycheck-haskell-default-test-dir)
   "Sandbox configuration file for our test suite.")
 
 (defconst flycheck-haskell-test-config-file
-  (expand-file-name "cabal.config" flycheck-haskell-test-dir)
+  (expand-file-name "cabal.config"
+                    flycheck-haskell-default-test-dir)
   "Cabal configuration file for our test suite.")
 
 
@@ -68,19 +87,9 @@
   "Run BODY with a fake file buffer."
   (declare (indent 0))
   `(with-temp-buffer
-     (let* ((default-directory flycheck-haskell-test-dir)
+     (let* ((default-directory flycheck-haskell-default-test-dir)
             (buffer-file-name (expand-file-name "test.hs")))
        ,@body)))
-
-(defun flycheck-haskell--concat-dirs (&rest dirs)
-  "Combine multiple relative directory names into one.
-
-Combine directory names in DIRS into one long directory name
-using directory separator."
-  (cl-reduce
-   #'concat
-   (seq-map #'file-name-as-directory dirs)
-   :initial-value nil))
 
 
 ;;; Cabal support
@@ -102,7 +111,7 @@ using directory separator."
                  .source-directories
                  (seq-map (lambda (fn)
                             (file-name-as-directory
-                             (expand-file-name fn flycheck-haskell-test-dir)))
+                             (expand-file-name fn flycheck-haskell-default-test-dir)))
                           '("lib/" "." "src/"))))))
 
 (ert-deftest flycheck-haskell-read-cabal-configuration/build-dirs ()
@@ -260,7 +269,7 @@ using directory separator."
          (sourcedirs (seq-map
                       (lambda (d)
                         (file-name-as-directory
-                         (expand-file-name d flycheck-haskell-test-dir)))
+                         (expand-file-name d flycheck-haskell-default-test-dir)))
                       '("lib/" "." "src/"))))
     (let-alist config
       (with-temp-buffer
