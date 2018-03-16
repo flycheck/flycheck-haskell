@@ -30,7 +30,6 @@
 
 (require 'let-alist)
 (require 'cl-lib)
-(require 'dash)
 (require 'ert)
 
 

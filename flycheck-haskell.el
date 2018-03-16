@@ -212,8 +212,9 @@ KEY is a symbol denoting the key whose value to get.  Return
 a `(KEY . VALUE)' cons cell."
   (save-excursion
     (goto-char (point-min))
-    (-when-let (setting (haskell-cabal--get-field (symbol-name key)))
-      (cons key (substring-no-properties setting)))))
+    (let ((setting (haskell-cabal--get-field (symbol-name key))))
+      (when setting
+        (cons key (substring-no-properties setting))))))
 
 (defun flycheck-haskell-parse-config-file (keys config-file)
   "Parse KEYS from CONFIG-FILE.
@@ -228,28 +229,31 @@ KEYS."
 
 Return the absolute path of CONFIG-FILE as string, or nil if
 CONFIG-FILE was not found."
-  (-when-let (root-dir (locate-dominating-file (buffer-file-name) config-file))
-    (expand-file-name config-file root-dir)))
+  (let ((root-dir (locate-dominating-file (buffer-file-name) config-file)))
+    (when root-dir
+      (expand-file-name config-file root-dir))))
 
 (defun flycheck-haskell-get-cabal-config ()
   "Get Cabal configuration for the current buffer.
 
 Return an alist with the Cabal configuration for the current
 buffer."
-  (-when-let (file-name (flycheck-haskell-find-config
-                         flycheck-haskell-cabal-config))
-    (flycheck-haskell-parse-config-file flycheck-haskell-cabal-config-keys
-                                        file-name)))
+  (let ((file-name (flycheck-haskell-find-config
+                    flycheck-haskell-cabal-config)))
+    (when file-name
+      (flycheck-haskell-parse-config-file flycheck-haskell-cabal-config-keys
+                                          file-name))))
 
 (defun flycheck-haskell-get-sandbox-config ()
   "Get sandbox configuration for the current buffer.
 
 Return an alist with the sandbox configuration for the current
 buffer."
-  (-when-let (file-name (flycheck-haskell-find-config
-                         flycheck-haskell-sandbox-config))
-    (flycheck-haskell-parse-config-file flycheck-haskell-sandbox-config-keys
-                                        file-name)))
+  (let ((file-name (flycheck-haskell-find-config
+                    flycheck-haskell-sandbox-config)))
+    (when file-name
+      (flycheck-haskell-parse-config-file flycheck-haskell-sandbox-config-keys
+                                          file-name))))
 
 
 ;;; Buffer setup
@@ -284,9 +288,11 @@ buffer."
   "Set paths and package database for the current project."
   (interactive)
   (when (and (buffer-file-name) (file-directory-p default-directory))
-    (-when-let* ((cabal-file (haskell-cabal-find-file))
-                 (config (flycheck-haskell-get-configuration cabal-file)))
-      (flycheck-haskell-process-configuration config))
+    (let ((cabal-file (haskell-cabal-find-file)))
+      (when cabal-file
+        (let ((config (flycheck-haskell-get-configuration cabal-file)))
+          (when config
+            (flycheck-haskell-process-configuration config)))))
 
     (let-alist (flycheck-haskell-get-cabal-config)
       (when .with-compiler
