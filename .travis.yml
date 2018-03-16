@@ -10,45 +10,41 @@ matrix:
      - env: GHC=head EVM_EMACS=emacs-25.3-travis
 
   include:
-    - env: GHC=7.8.4 EVM_EMACS=emacs-24.4-travis
-      compiler: ": GHC 7.8.4, EMACS 24.4"
-      addons: {apt: {packages: [ghc-7.8.4], sources: [hvr-ghc]}}
+    - env: GHC=7.2.2 EVM_EMACS=emacs-25.3-travis
+      compiler: ": GHC 7.2.2, EMACS 25.3"
+      addons: {apt: {packages: [ghc-7.2.2], sources: [hvr-ghc]}}
+
+    - env: GHC=7.4.2 EVM_EMACS=emacs-25.3-travis
+      compiler: ": GHC 7.4.2, EMACS 25.3"
+      addons: {apt: {packages: [ghc-7.4.2], sources: [hvr-ghc]}}
+
+    - env: GHC=7.6.3 EVM_EMACS=emacs-25.3-travis
+      compiler: ": GHC 7.6.3, EMACS 25.3"
+      addons: {apt: {packages: [ghc-7.6.3], sources: [hvr-ghc]}}
 
     - env: GHC=7.8.4 EVM_EMACS=emacs-25.3-travis
       compiler: ": GHC 7.8.4, EMACS 25.3"
       addons: {apt: {packages: [ghc-7.8.4], sources: [hvr-ghc]}}
 
-
-    - env: GHC=7.10.3 EVM_EMACS=emacs-24.4-travis
-      compiler: ": GHC 7.10.3, EMACS 24.4"
-      addons: {apt: {packages: [ghc-7.10.3], sources: [hvr-ghc]}}
-
     - env: GHC=7.10.3 EVM_EMACS=emacs-25.3-travis
       compiler: ": GHC 7.10.3, EMACS 25.3"
       addons: {apt: {packages: [ghc-7.10.3], sources: [hvr-ghc]}}
-
-
-    - env: GHC=8.0.2 EVM_EMACS=emacs-24.4-travis
-      compiler: ": GHC 8.0.2, EMACS 24.4"
-      addons: {apt: {packages: [ghc-8.0.2], sources: [hvr-ghc]}}
 
     - env: GHC=8.0.2 EVM_EMACS=emacs-25.3-travis
       compiler: ": GHC 8.0.2, EMACS 25.3"
       addons: {apt: {packages: [ghc-8.0.2], sources: [hvr-ghc]}}
 
-
-    - env: GHC=8.2.2 EVM_EMACS=emacs-24.4-travis
-      compiler: ": GHC 8.2.2, EMACS 24.4"
-      addons: {apt: {packages: [ghc-8.2.2], sources: [hvr-ghc]}}
-
     - env: GHC=8.2.2 EVM_EMACS=emacs-25.3-travis
       compiler: ": GHC 8.2.2, EMACS 25.3"
       addons: {apt: {packages: [ghc-8.2.2], sources: [hvr-ghc]}}
 
+    - env: GHC=8.4.1 EVM_EMACS=emacs-24.4-travis
+      compiler: ": GHC 8.4.1, EMACS 24.4"
+      addons: {apt: {packages: [ghc-8.4.1], sources: [hvr-ghc]}}
 
-    - env: GHC=head EVM_EMACS=emacs-24.4-travis
-      compiler: ": GHC HEAD, EMACS 24.4"
-      addons: {apt: {packages: [ghc-head], sources: [hvr-ghc]}}
+    - env: GHC=8.4.1 EVM_EMACS=emacs-25.3-travis
+      compiler: ": GHC 8.4.1, EMACS 25.3"
+      addons: {apt: {packages: [ghc-8.4.1], sources: [hvr-ghc]}}
 
     - env: GHC=head EVM_EMACS=emacs-25.3-travis
       compiler: ": GHC HEAD, EMACS 25.3"
