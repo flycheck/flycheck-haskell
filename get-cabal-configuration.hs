@@ -237,9 +237,9 @@ isAllowedOption opt =
     S.member opt allowedOptions || any (`isPrefixOf` opt) allowedOptionPrefixes
 
 dumpPackageDescription :: PackageDescription -> FilePath -> IO Sexp
-dumpPackageDescription pkgDesc cabalFile = do
-    (cabalDirs, cabalAutogen) <- getBuildDirectories Cabal pkgDesc cabalDir
-    (stackDirs, stackAutogen) <- getBuildDirectories Stack pkgDesc cabalDir
+dumpPackageDescription pkgDesc projectDir = do
+    (cabalDirs, cabalAutogen) <- getBuildDirectories Cabal pkgDesc projectDir
+    (stackDirs, stackAutogen) <- getBuildDirectories Stack pkgDesc projectDir
     let buildDirs   = cabalDirs ++ stackDirs
         autogenDirs = cabalAutogen ++ stackAutogen
     return $
@@ -253,12 +253,10 @@ dumpPackageDescription pkgDesc cabalFile = do
             , cons (sym "autogen-directories") (map normalise autogenDirs)
             ]
   where
-    cabalDir :: FilePath
-    cabalDir = dropFileName cabalFile
     buildInfo :: [BuildInfo]
     buildInfo = allBuildInfo pkgDesc
     sourceDirs :: [FilePath]
-    sourceDirs = ordNub (map normalise (getSourceDirectories buildInfo cabalDir))
+    sourceDirs = ordNub (map normalise (getSourceDirectories buildInfo projectDir))
     exts :: [Extension]
     exts = nub (concatMap usedExtensions buildInfo)
     langs :: [Language]
@@ -278,16 +276,18 @@ dumpPackageDescription pkgDesc cabalFile = do
         ordNub (filter isAllowedOption (concatMap (hcOptions GHC) buildInfo))
 
 dumpCabalConfiguration :: FilePath -> IO ()
-dumpCabalConfiguration cabalFile = do
+dumpCabalConfiguration configFile = do
     genericDesc <-
 #if Cabal2
-        readGenericPackageDescription silent cabalFile
+        readGenericPackageDescription silent configFile
 #else
-        readPackageDescription silent cabalFile
+        readPackageDescription silent configFile
 #endif
     case getConcretePackageDescription genericDesc of
-        Left e        -> putStrLn $ "Issue with package configuration\n" ++ show e
-        Right pkgDesc -> print =<< dumpPackageDescription pkgDesc cabalFile
+        Left e        -> do
+            putStrLn $ "Issue with package configuration\n" ++ show e
+            exitFailure
+        Right pkgDesc -> print =<< dumpPackageDescription pkgDesc (dropFileName configFile)
 
 getConcretePackageDescription
     :: GenericPackageDescription
