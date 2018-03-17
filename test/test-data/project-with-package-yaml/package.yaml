@@ -35,6 +35,7 @@ executables:
     ghc-options:         -Wcompat
 
   flycheck-haskell-unknown-stuff:
+    main: FlycheckUnknown.hs
     # This shall test the handling of unknown language and extension values
     dependencies: base >=4.7 && <4.8
     default-extensions:          YouDontKnowThisOne
