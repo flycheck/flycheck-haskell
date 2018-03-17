@@ -19,43 +19,43 @@ matrix:
 
   include:
     - env: GHC=7.2.2 CABALVER=1.16 EVM_EMACS=emacs-25.3-travis
-      compiler: ": GHC 7.2.2, Cabal 1.16, EMACS 25.3"
+      compiler: "GHC 7.2.2, Cabal 1.16, EMACS 25.3"
       addons: {apt: {packages: [ghc-7.2.2, cabal-install-1.16], sources: [hvr-ghc]}}
 
     - env: GHC=7.4.2 CABALVER=1.16 EVM_EMACS=emacs-25.3-travis
-      compiler: ": GHC 7.4.2, Cabal 1.16, EMACS 25.3"
+      compiler: "GHC 7.4.2, Cabal 1.16, EMACS 25.3"
       addons: {apt: {packages: [ghc-7.4.2, cabal-install-1.16], sources: [hvr-ghc]}}
 
     - env: GHC=7.6.3 CABALVER=1.18 EVM_EMACS=emacs-25.3-travis
-      compiler: ": GHC 7.6.3, Cabal 1.18, EMACS 25.3"
+      compiler: "GHC 7.6.3, Cabal 1.18, EMACS 25.3"
       addons: {apt: {packages: [ghc-7.6.3, cabal-install-1.18], sources: [hvr-ghc]}}
 
     - env: GHC=7.8.4 CABALVER=1.20 EVM_EMACS=emacs-25.3-travis
-      compiler: ": GHC 7.8.4, Cabal 1.20, EMACS 25.3"
+      compiler: "GHC 7.8.4, Cabal 1.20, EMACS 25.3"
       addons: {apt: {packages: [ghc-7.8.4, cabal-install-1.20], sources: [hvr-ghc]}}
 
     - env: GHC=7.10.3 CABALVER=1.22 EVM_EMACS=emacs-25.3-travis
-      compiler: ": GHC 7.10.3, Cabal 1.22, EMACS 25.3"
+      compiler: "GHC 7.10.3, Cabal 1.22, EMACS 25.3"
       addons: {apt: {packages: [ghc-7.10.3, cabal-install-1.22], sources: [hvr-ghc]}}
 
     - env: GHC=8.0.2 CABALVER=1.24 EVM_EMACS=emacs-25.3-travis
-      compiler: ": GHC 8.0.2, Cabal 1.24, EMACS 25.3"
+      compiler: "GHC 8.0.2, Cabal 1.24, EMACS 25.3"
       addons: {apt: {packages: [ghc-8.0.2, cabal-install-1.24], sources: [hvr-ghc]}}
 
     - env: GHC=8.2.2 CABALVER=2.0 EVM_EMACS=emacs-25.3-travis
-      compiler: ": GHC 8.2.2, Cabal 2.0, EMACS 25.3"
+      compiler: "GHC 8.2.2, Cabal 2.0, EMACS 25.3"
       addons: {apt: {packages: [ghc-8.2.2, cabal-install-2.0], sources: [hvr-ghc]}}
 
     - env: GHC=8.4.1 CABALVER=2.0 EVM_EMACS=emacs-24.4-travis
-      compiler: ": GHC 8.4.1, Cabal 2.2, EMACS 24.4"
+      compiler: "GHC 8.4.1, Cabal 2.2, EMACS 24.4"
       addons: {apt: {packages: [ghc-8.4.1, cabal-install-2.2], sources: [hvr-ghc]}}
 
     - env: GHC=8.4.1 CABALVER=2.2 EVM_EMACS=emacs-25.3-travis
-      compiler: ": GHC 8.4.1, Cabal 2.2, EMACS 25.3"
+      compiler: "GHC 8.4.1, Cabal 2.2, EMACS 25.3"
       addons: {apt: {packages: [ghc-8.4.1, cabal-install-2.2], sources: [hvr-ghc]}}
 
     - env: GHC=head CABALVER=head EVM_EMACS=emacs-25.3-travis
-      compiler: ": GHC HEAD, Cabal HEAD, EMACS 25.3"
+      compiler: "GHC HEAD, Cabal HEAD, EMACS 25.3"
       addons: {apt: {packages: [ghc-head, cabal-install-head], sources: [hvr-ghc]}}
 
 install: true
