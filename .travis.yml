@@ -84,11 +84,12 @@ before_install:
 install:
   - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
   - echo "$(ghc-pkg list)"
-  - travis_retry cabal update
-  - cabal install hpack
   - make compile
+  - echo "Installing dependencies"
+  - travis_retry cabal update
+  - cabal install hpack hlint
 
 script:
   # FIXME: Restore hlint as soon as we find a simple way to install it on Travis CI
-  # - make HLINTFLAGS=-c lint
+  - make HLINTFLAGS=-c lint
   - make test

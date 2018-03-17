@@ -228,7 +228,7 @@ getBuildDirectories tool pkgDesc cabalDir = do
 
 getAutogenDirs :: FilePath -> [String] -> IO [FilePath]
 getAutogenDirs buildDir componentNames =
-    fmap (autogenDir :) $ componentsAutogenDirs buildDir componentNames
+    (autogenDir :) A.<$> componentsAutogenDirs buildDir componentNames
   where
     -- 'dist/bulid/autogen' OR '.stack-work/dist/x86_64-linux/Cabal-1.24.2.0/build/autogen'
     autogenDir :: FilePath
@@ -345,11 +345,11 @@ readHPackPkgDescr exe configFile projectDir = do
         }
 
 readGenericPkgDescr :: FilePath -> IO GenericPackageDescription
-readGenericPkgDescr configFile =
+readGenericPkgDescr =
 #if defined(Cabal20) || defined(Cabal22)
-    readGenericPackageDescription silent configFile
+    readGenericPackageDescription silent
 #else
-    readPackageDescription silent configFile
+    readPackageDescription silent
 #endif
 
 newtype CabalFileContents = CabalFileContents
@@ -551,7 +551,7 @@ data Config f = Config
 reifyConfig :: Config Maybe -> IO (Config Identity)
 reifyConfig Config{cfgInputFile, cfgHPackExe} = do
     cfgInputFile' <- case cfgInputFile of
-        Nothing   -> die' $ "Input file not specified. Use --cabal-file or --hpack-file to specify one."
+        Nothing   -> die' "Input file not specified. Use --cabal-file or --hpack-file to specify one."
         Just path -> return path
     return Config
         { cfgInputFile = Identity cfgInputFile'
