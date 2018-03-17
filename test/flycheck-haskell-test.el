@@ -120,6 +120,7 @@ using directory separator."
                       "GeneralizedNewtypeDeriving"))))))
 
 (ert-deftest flycheck-haskell-read-hpack-configuration/has-all-extensions ()
+  (skip-unless flycheck-haskell-hpack-executable)
   (let-alist (flycheck-haskell-read-test-hpack-config)
     (should (equal (flycheck-haskell--sort-strs .extensions)
                    (flycheck-haskell--sort-strs
@@ -133,7 +134,8 @@ using directory separator."
                                              "SpamLanguage"
                                              "Haskell2010")))))
 
-(ert-deftest flycheck-haskell-read-cabal-configuration/has-all-languages ()
+(ert-deftest flycheck-haskell-read-hpack-configuration/has-all-languages ()
+  (skip-unless flycheck-haskell-hpack-executable)
   (let-alist (flycheck-haskell-read-test-hpack-config)
     (should-not (seq-difference .languages '("Haskell98"
                                              "SpamLanguage"
@@ -150,6 +152,7 @@ using directory separator."
                            '("lib/" "." "src/")))))))
 
 (ert-deftest flycheck-haskell-read-hpack-configuration/source-dirs ()
+  (skip-unless flycheck-haskell-hpack-executable)
   (let-alist (flycheck-haskell-read-test-hpack-config)
     (should-not (seq-difference
                  (flycheck-haskell--sort-strs .source-directories)
@@ -173,6 +176,7 @@ using directory separator."
                             .build-directories)))))))
 
 (ert-deftest flycheck-haskell-read-hpack-configuration/build-dirs ()
+  (skip-unless flycheck-haskell-hpack-executable)
   (let* ((builddirs '("build" "build/autogen"
                       "build/flycheck-haskell-unknown-stuff/flycheck-haskell-unknown-stuff-tmp"
                       "build/flycheck-haskell-test/flycheck-haskell-test-tmp")))
@@ -190,6 +194,7 @@ using directory separator."
     (should (member "-DDEBUG=1" .other-options))))
 
 (ert-deftest flycheck-haskell-read-hpack-configuration/cpp-options ()
+  (skip-unless flycheck-haskell-hpack-executable)
   (let-alist (flycheck-haskell-read-test-hpack-config)
     (should (member "-DDEBUG=1" .other-options))))
 
@@ -198,6 +203,7 @@ using directory separator."
     (should (member "-Wall" .other-options))))
 
 (ert-deftest flycheck-haskell-read-hpack-configuration/ghc-options ()
+  (skip-unless flycheck-haskell-hpack-executable)
   (let-alist (flycheck-haskell-read-test-hpack-config)
     (should (member "-Wall" .other-options))))
 
@@ -252,6 +258,7 @@ using directory separator."
                       flycheck-haskell-test-cabal-file))))))
 
 (ert-deftest flycheck-haskell-get-cached-configuration/cached-hpack-config ()
+  (skip-unless flycheck-haskell-hpack-executable)
   (flycheck-haskell-test-with-cache
     (flycheck-haskell-read-and-cache-configuration
      flycheck-haskell-test-hpack-file)
@@ -341,6 +348,7 @@ using directory separator."
     (should (local-variable-p 'flycheck-ghc-language-extensions))))
 
 (ert-deftest flycheck-haskell-process-configuration/hpack-language-extensions ()
+  (skip-unless flycheck-haskell-hpack-executable)
   (with-temp-buffer                     ; To scope the variables
     (flycheck-haskell-process-configuration (flycheck-haskell-read-test-hpack-config))
     (should-not (seq-difference flycheck-ghc-language-extensions
@@ -368,6 +376,7 @@ using directory separator."
                             :test #'equal))))))
 
 (ert-deftest flycheck-haskell-process-configuration/hpack-search-path ()
+  (skip-unless flycheck-haskell-hpack-executable)
   (let* ((config (flycheck-haskell-read-test-hpack-config))
          (sourcedirs (seq-map
                       (lambda (d)
