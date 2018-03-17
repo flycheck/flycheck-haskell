@@ -357,9 +357,11 @@ buffer."
               (locate-dominating-file default-directory "package.yaml"))))
     (if cabal-file
         (if hpack-file
-            (pcase flycheck-haskell-hpack-preference
-              ('prefer-hpack hpack-file)
-              (_             cabal-file))
+            (cond
+              ((eq 'prefer-hpack flycheck-haskell-hpack-preference)
+               hpack-file)
+              (t
+               cabal-file))
           cabal-file)
       hpack-file)))
 
