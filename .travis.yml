@@ -7,7 +7,7 @@ sudo: false
 cache:
   directories:
     - "$HOME/.cabal"
-    - "$HOME/.cask"
+    - "$HOME/.emacs.d/.cask"
 
 # Speed up git.
 git:
@@ -91,6 +91,7 @@ before_install:
     fi
 
 install:
+  - echo "$PATH"
   - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
   - echo "$(ghc-pkg list)"
   - make compile
