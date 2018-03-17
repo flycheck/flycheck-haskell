@@ -29,17 +29,22 @@
 module Main (main) where
 
 #if __GLASGOW_HASKELL__ >= 800
-# if MIN_VERSION_Cabal(2,2,0)
+# if MIN_VERSION_Cabal(2, 2, 0)
 #  define Cabal22 1
-# elif MIN_VERSION_Cabal(2,0,0)
+# elif MIN_VERSION_Cabal(2, 0, 0)
 #  define Cabal20 1
 # endif
 #else
 -- Hack - we may actually be using Cabal 2.0 with e.g. 7.8 GHC. But
 -- that's not likely to occur for average user who's relying on
 -- packages bundled with GHC. The 2.0 Cabal is bundled starting with 8.2.1.
-#undef Cabal22
-#undef Cabal20
+# undef Cabal22
+# undef Cabal20
+
+#endif
+
+#if __GLASGOW_HASKELL__ >= 704
+# define Cabal114OrMore 1
 #endif
 
 #if __GLASGOW_HASKELL__ <= 763
@@ -109,11 +114,18 @@ import System.Directory (doesDirectoryExist)
 import Control.Arrow (second)
 import Data.Version (showVersion)
 import Distribution.Package (PackageName(..))
+import Distribution.PackageDescription.Configuration
+       (finalizePackageDescription, mapTreeData)
+
+# if Cabal114OrMore
 import Distribution.PackageDescription
        (TestSuite(..), Benchmark(..), condTestSuites, condBenchmarks,
         benchmarkEnabled, testEnabled)
-import Distribution.PackageDescription.Configuration
-       (finalizePackageDescription, mapTreeData)
+# else
+import Distribution.PackageDescription
+       (TestSuite(..), condTestSuites, testEnabled)
+# endif
+
 #endif
 
 #if defined(Cabal22)
@@ -424,30 +436,47 @@ getConcretePackageDescription genericDesc = do
         buildCompilerId
         []           -- Additional constraints
         genericDesc
+#elif Cabal114OrMore
+     -- This let block is eerily like one in Cabal.Distribution.Simple.Configure
+     let enableTest :: TestSuite -> TestSuite
+         enableTest t = t { testEnabled = True }
+         enableBenchmark :: Benchmark -> Benchmark
+         enableBenchmark bm = bm { benchmarkEnabled = True }
+         flaggedTests =
+             map (second (mapTreeData enableTest)) (condTestSuites genericDesc)
+         flaggedBenchmarks =
+             map
+                 (second (mapTreeData enableBenchmark))
+                 (condBenchmarks genericDesc)
+         genericDesc' =
+             genericDesc
+             { condTestSuites = flaggedTests
+             , condBenchmarks = flaggedBenchmarks
+             }
+     fst A.<$> finalizePackageDescription
+         []
+         (const True)
+         buildPlatform
+         buildCompilerId
+         []
+         genericDesc'
 #else
-    -- This let block is eerily like one in Cabal.Distribution.Simple.Configure
-    let enableTest :: TestSuite -> TestSuite
-        enableTest t = t { testEnabled = True }
-        enableBenchmark :: Benchmark -> Benchmark
-        enableBenchmark bm = bm { benchmarkEnabled = True }
-        flaggedTests =
-            map (second (mapTreeData enableTest)) (condTestSuites genericDesc)
-        flaggedBenchmarks =
-            map
-                (second (mapTreeData enableBenchmark))
-                (condBenchmarks genericDesc)
-        genericDesc' =
-            genericDesc
-            { condTestSuites = flaggedTests
-            , condBenchmarks = flaggedBenchmarks
-            }
-    fst A.<$> finalizePackageDescription
-        []
-        (const True)
-        buildPlatform
-        buildCompilerId
-        []
-        genericDesc'
+     -- This let block is eerily like one in Cabal.Distribution.Simple.Configure
+     let enableTest :: TestSuite -> TestSuite
+         enableTest t = t { testEnabled = True }
+         flaggedTests =
+             map (second (mapTreeData enableTest)) (condTestSuites genericDesc)
+         genericDesc' =
+             genericDesc
+             { condTestSuites = flaggedTests
+             }
+     fst A.<$> finalizePackageDescription
+         []
+         (const True)
+         buildPlatform
+         buildCompilerId
+         []
+         genericDesc'
 #endif
 
 componentsAutogenDirs :: FilePath -> [String] -> IO [FilePath]
