@@ -218,9 +218,9 @@ getBuildDirectories tool pkgDesc cabalDir = do
 
         componentNames :: [String]
         componentNames =
-            map getExeName   (executables pkgDesc) ++
-            map getTestName  (testSuites pkgDesc) ++
-            map getBenchName (benchmarks pkgDesc)
+            getExeNames pkgDesc ++
+            getTestNames pkgDesc ++
+            getBenchmarkNames pkgDesc
 
     autogenDirs <- getAutogenDirs buildDir componentNames
 
@@ -506,29 +506,46 @@ buildCompilerId = unknownCompilerInfo compId NoAbiTag
 # endif
 #endif
 
-getExeName :: Executable -> FilePath
-getExeName =
+getExeNames :: PackageDescription -> [String]
+getExeNames =
+    map getExeName . executables
+  where
+    getExeName :: Executable -> FilePath
+    getExeName =
 #if defined(Cabal20) || defined(Cabal22)
-    unUnqualComponentName . exeName
+        unUnqualComponentName . exeName
 #else
-    exeName
+        exeName
 #endif
 
-getTestName :: TestSuite -> FilePath
-getTestName =
+getTestNames :: PackageDescription -> [String]
+getTestNames =
+    map getTestName . testSuites
+  where
+    getTestName :: TestSuite -> FilePath
+    getTestName =
 #if defined(Cabal20) || defined(Cabal22)
-    unUnqualComponentName . testName
+        unUnqualComponentName . testName
 #else
-    testName
+        testName
 #endif
 
-getBenchName :: Benchmark -> FilePath
-getBenchName =
-#if defined(Cabal20) || defined(Cabal22)
-    unUnqualComponentName . benchmarkName
+getBenchmarkNames :: PackageDescription -> [String]
+getBenchmarkNames =
+#ifdef Cabal114OrMore
+    map getBenchName . benchmarks
+  where
+    getBenchName :: Benchmark -> FilePath
+    getBenchName =
+# if defined(Cabal20) || defined(Cabal22)
+        unUnqualComponentName . benchmarkName
+# else
+        benchmarkName
+# endif
 #else
-    benchmarkName
+    const []
 #endif
+
 
 -- Textual representation of cabal version
 cabalVersion' :: String
