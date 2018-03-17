@@ -4,51 +4,59 @@ language: generic
 # Explicitly request container-based infrastructure.
 sudo: false
 
+cache:
+  directories:
+    - "$HOME/.cabal"
+    - "$HOME/.cask"
+
+# Speed up git.
+git:
+  depth: 5
+
 matrix:
   allow_failures:
-     - env: GHC=head EVM_EMACS=emacs-24.4-travis
      - env: GHC=head EVM_EMACS=emacs-25.3-travis
 
   include:
-    - env: GHC=7.2.2 EVM_EMACS=emacs-25.3-travis
-      compiler: ": GHC 7.2.2, EMACS 25.3"
-      addons: {apt: {packages: [ghc-7.2.2], sources: [hvr-ghc]}}
+    - env: GHC=7.2.2 CABALVER=1.16 EVM_EMACS=emacs-25.3-travis
+      compiler: ": GHC 7.2.2, Cabal 1.16, EMACS 25.3"
+      addons: {apt: {packages: [ghc-7.2.2, cabal-install-1.16], sources: [hvr-ghc]}}
 
-    - env: GHC=7.4.2 EVM_EMACS=emacs-25.3-travis
-      compiler: ": GHC 7.4.2, EMACS 25.3"
-      addons: {apt: {packages: [ghc-7.4.2], sources: [hvr-ghc]}}
+    - env: GHC=7.4.2 CABALVER=1.16 EVM_EMACS=emacs-25.3-travis
+      compiler: ": GHC 7.4.2, Cabal 1.16, EMACS 25.3"
+      addons: {apt: {packages: [ghc-7.4.2, cabal-install-1.16], sources: [hvr-ghc]}}
 
-    - env: GHC=7.6.3 EVM_EMACS=emacs-25.3-travis
-      compiler: ": GHC 7.6.3, EMACS 25.3"
-      addons: {apt: {packages: [ghc-7.6.3], sources: [hvr-ghc]}}
+    - env: GHC=7.6.3 CABALVER=1.18 EVM_EMACS=emacs-25.3-travis
+      compiler: ": GHC 7.6.3, Cabal 1.18, EMACS 25.3"
+      addons: {apt: {packages: [ghc-7.6.3, cabal-install-1.18], sources: [hvr-ghc]}}
 
-    - env: GHC=7.8.4 EVM_EMACS=emacs-25.3-travis
-      compiler: ": GHC 7.8.4, EMACS 25.3"
-      addons: {apt: {packages: [ghc-7.8.4], sources: [hvr-ghc]}}
+    - env: GHC=7.8.4 CABALVER=1.20 EVM_EMACS=emacs-25.3-travis
+      compiler: ": GHC 7.8.4, Cabal 1.20, EMACS 25.3"
+      addons: {apt: {packages: [ghc-7.8.4, cabal-install-1.20], sources: [hvr-ghc]}}
 
-    - env: GHC=7.10.3 EVM_EMACS=emacs-25.3-travis
-      compiler: ": GHC 7.10.3, EMACS 25.3"
-      addons: {apt: {packages: [ghc-7.10.3], sources: [hvr-ghc]}}
+    - env: GHC=7.10.3 CABALVER=1.22 EVM_EMACS=emacs-25.3-travis
+      compiler: ": GHC 7.10.3, Cabal 1.22, EMACS 25.3"
+      addons: {apt: {packages: [ghc-7.10.3, cabal-install-1.22], sources: [hvr-ghc]}}
 
-    - env: GHC=8.0.2 EVM_EMACS=emacs-25.3-travis
-      compiler: ": GHC 8.0.2, EMACS 25.3"
-      addons: {apt: {packages: [ghc-8.0.2], sources: [hvr-ghc]}}
+    - env: GHC=8.0.2 CABALVER=1.24 EVM_EMACS=emacs-25.3-travis
+      compiler: ": GHC 8.0.2, Cabal 1.24, EMACS 25.3"
+      addons: {apt: {packages: [ghc-8.0.2, cabal-install-1.24], sources: [hvr-ghc]}}
 
-    - env: GHC=8.2.2 EVM_EMACS=emacs-25.3-travis
-      compiler: ": GHC 8.2.2, EMACS 25.3"
-      addons: {apt: {packages: [ghc-8.2.2], sources: [hvr-ghc]}}
+    - env: GHC=8.2.2 CABALVER=2.0 EVM_EMACS=emacs-25.3-travis
+      compiler: ": GHC 8.2.2, Cabal 2.0, EMACS 25.3"
+      addons: {apt: {packages: [ghc-8.2.2, cabal-install-2.0], sources: [hvr-ghc]}}
 
-    - env: GHC=8.4.1 EVM_EMACS=emacs-24.4-travis
-      compiler: ": GHC 8.4.1, EMACS 24.4"
-      addons: {apt: {packages: [ghc-8.4.1], sources: [hvr-ghc]}}
+    - env: GHC=8.4.1 CABALVER=2.0 EVM_EMACS=emacs-24.4-travis
+      compiler: ": GHC 8.4.1, Cabal 2.2, EMACS 24.4"
+      addons: {apt: {packages: [ghc-8.4.1, cabal-install-2.2], sources: [hvr-ghc]}}
 
-    - env: GHC=8.4.1 EVM_EMACS=emacs-25.3-travis
-      compiler: ": GHC 8.4.1, EMACS 25.3"
-      addons: {apt: {packages: [ghc-8.4.1], sources: [hvr-ghc]}}
+    - env: GHC=8.4.1 CABALVER=2.2 EVM_EMACS=emacs-25.3-travis
+      compiler: ": GHC 8.4.1, Cabal 2.2, EMACS 25.3"
+      addons: {apt: {packages: [ghc-8.4.1, cabal-install-2.2], sources: [hvr-ghc]}}
 
-    - env: GHC=head EVM_EMACS=emacs-25.3-travis
-      compiler: ": GHC HEAD, EMACS 25.3"
-      addons: {apt: {packages: [ghc-head], sources: [hvr-ghc]}}
+    - env: GHC=head CABALVER=head EVM_EMACS=emacs-25.3-travis
+      compiler: ": GHC HEAD, Cabal HEAD, EMACS 25.3"
+      addons: {apt: {packages: [ghc-head, cabal-install-head], sources: [hvr-ghc]}}
 
 install: true
 
@@ -57,7 +65,7 @@ before_install:
   # Using compiler above sets CC to an invalid value, so unset it
   - unset CC
 
-  - export PATH="/opt/ghc/$GHCVER/bin:$PATH"
+  - export PATH="/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$HOME/.cabal/bin:$PATH"
 
    # ????
   - mkdir -p ~/.local/bin
@@ -76,9 +84,11 @@ before_install:
 install:
   - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
   - echo "$(ghc-pkg list)"
+  - travis_retry cabal update
+  - cabal install hpack
+  - make compile
 
 script:
-  - make compile
   # FIXME: Restore hlint as soon as we find a simple way to install it on Travis CI
   # - make HLINTFLAGS=-c lint
   - make test
