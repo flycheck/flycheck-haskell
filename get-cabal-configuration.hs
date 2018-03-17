@@ -42,6 +42,12 @@ module Main (main) where
 #undef Cabal20
 #endif
 
+#if __GLASGOW_HASKELL__ <= 763
+#undef HAVE_DATA_FUNCTOR_IDENTITY
+#else
+#define HAVE_DATA_FUNCTOR_IDENTITY
+#endif
+
 import qualified Control.Applicative as A
 import Control.Exception (SomeException, try)
 import Control.Monad (when)
@@ -49,7 +55,9 @@ import Control.Monad (when)
 import qualified Data.ByteString as BS
 #endif
 import Data.Char (isSpace)
+#if defined(HAVE_DATA_FUNCTOR_IDENTITY)
 import Data.Functor.Identity
+#endif
 import Data.List (isPrefixOf, nub, foldl')
 import Data.Set (Set)
 import qualified Data.Set as S
@@ -520,6 +528,10 @@ die' :: String -> IO a
 die' msg = do
     hPutStrLn stderr msg
     exitFailure
+
+#if !defined(HAVE_DATA_FUNCTOR_IDENTITY)
+newtype Identity a = Identity { runIdentity :: a }
+#endif
 
 data ConfigurationFile =
       CabalFile FilePath
