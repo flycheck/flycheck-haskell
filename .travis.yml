@@ -96,6 +96,7 @@ install:
   - |
     if [ "$INSTALL_HPACK" = 1 ]; then
       travis_retry cabal update
+      cabal install hsc2hs
       cabal install hpack
     fi
   - |
