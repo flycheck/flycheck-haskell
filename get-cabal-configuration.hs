@@ -47,6 +47,10 @@ module Main (main) where
 # define Cabal114OrMore 1
 #endif
 
+#if __GLASGOW_HASKELL__ < 710
+# define Cabal118OrLess 1
+#endif
+
 #if __GLASGOW_HASKELL__ <= 763
 #undef HAVE_DATA_FUNCTOR_IDENTITY
 #else
@@ -66,7 +70,7 @@ import Data.Functor.Identity
 import Data.List (isPrefixOf, nub, foldl')
 import Data.Set (Set)
 import qualified Data.Set as S
-#ifdef USE_COMPILER_ID
+#ifdef Cabal118OrLess
 import Distribution.Compiler
        (CompilerFlavor(GHC), CompilerId(CompilerId), buildCompilerFlavor)
 #else
@@ -488,7 +492,7 @@ componentsAutogenDirs buildDir componentNames =
 componentsAutogenDirs _ _ = return []
 #endif
 
-#if defined(USE_COMPILER_ID)
+#if defined(Cabal118OrLess)
 buildCompilerId :: CompilerId
 buildCompilerId = CompilerId buildCompilerFlavor compilerVersion
 #else

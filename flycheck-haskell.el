@@ -129,22 +129,11 @@ make it pick `.cabal' file in such a case."
   (expand-file-name "get-cabal-configuration.hs" flycheck-haskell-directory)
   "The helper to dump the Cabal configuration.")
 
-(defconst flycheck-haskell-flags-helper
-  (expand-file-name "get-flags.hs" flycheck-haskell-directory)
-  "The helper to get compiler flags for the Cabal helper.")
-
 (defun flycheck-haskell-runghc-command (args)
   "Create a runghc command with ARGS.
 
 Take the base command from `flycheck-haskell-runghc-command'."
   (append flycheck-haskell-runghc-command args nil))
-
-(defun flycheck-haskell--get-flags ()
-  "Get GHC flags to run the Cabal helper."
-  (ignore-errors
-    (apply #'process-lines
-           (flycheck-haskell-runghc-command
-            (list flycheck-haskell-flags-helper)))))
 
 (defun flycheck-haskell--read-configuration-with-helper (command)
   (with-temp-buffer
@@ -157,18 +146,16 @@ Take the base command from `flycheck-haskell-runghc-command'."
 
 (defun flycheck-haskell-read-cabal-configuration (cabal-file)
   "Read the Cabal configuration from CABAL-FILE."
-  (let ((args (append (flycheck-haskell--get-flags)
-                      (list flycheck-haskell-helper "--cabal-file" cabal-file))))
+  (let ((args (list flycheck-haskell-helper "--cabal-file" cabal-file)))
     (flycheck-haskell--read-configuration-with-helper
      (flycheck-haskell-runghc-command args))))
 
 (defun flycheck-haskell-read-hpack-configuration (hpack-file)
   "Read the hpack configuration from HPACK-FILE."
   (cl-assert flycheck-haskell-hpack-executable)
-  (let ((args (append (flycheck-haskell--get-flags)
-                      (list flycheck-haskell-helper
-                            "--hpack-exe" flycheck-haskell-hpack-executable
-                            "--hpack-file" hpack-file))))
+  (let ((args (list flycheck-haskell-helper
+                    "--hpack-exe" flycheck-haskell-hpack-executable
+                    "--hpack-file" hpack-file)))
     (flycheck-haskell--read-configuration-with-helper
      (flycheck-haskell-runghc-command args))))
 
