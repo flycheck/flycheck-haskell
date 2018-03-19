@@ -146,7 +146,7 @@ Take the base command from `flycheck-haskell-runghc-command'."
 
 (defun flycheck-haskell-read-cabal-configuration (cabal-file)
   "Read the Cabal configuration from CABAL-FILE."
-  (let ((args (list flycheck-haskell-helper "--cabal-file" cabal-file)))
+  (let ((args (list flycheck-haskell-helper "--cabal-file" (expand-file-name cabal-file))))
     (flycheck-haskell--read-configuration-with-helper
      (flycheck-haskell-runghc-command args))))
 
@@ -155,7 +155,7 @@ Take the base command from `flycheck-haskell-runghc-command'."
   (cl-assert flycheck-haskell-hpack-executable)
   (let ((args (list flycheck-haskell-helper
                     "--hpack-exe" flycheck-haskell-hpack-executable
-                    "--hpack-file" hpack-file)))
+                    "--hpack-file" (expand-file-name hpack-file))))
     (flycheck-haskell--read-configuration-with-helper
      (flycheck-haskell-runghc-command args))))
 
@@ -339,10 +339,13 @@ buffer."
         (setq-local flycheck-ghc-no-user-package-database t)))))
 
 (defun flycheck-haskell--find-config-file ()
-  (let ((cabal-file (haskell-cabal-find-file))
-        (hpack-file
-         (and flycheck-haskell-hpack-executable
-              (locate-dominating-file default-directory "package.yaml"))))
+  (let* ((cabal-file (haskell-cabal-find-file))
+         (hpack-dir
+          (and flycheck-haskell-hpack-executable
+               (locate-dominating-file default-directory "package.yaml")))
+         (hpack-file
+          (when hpack-dir
+            (concat hpack-dir "/package.yaml"))))
     (if cabal-file
         (if hpack-file
             (cond
