@@ -29,6 +29,10 @@
 module Main (main) where
 
 #if __GLASGOW_HASKELL__ >= 800
+#define GHC_INCLUDES_VERSION_MACRO 1
+#endif
+
+#if defined(GHC_INCLUDES_VERSION_MACRO)
 # if MIN_VERSION_Cabal(2, 2, 0)
 #  define Cabal22 1
 # elif MIN_VERSION_Cabal(2, 0, 0)
@@ -191,6 +195,9 @@ instance ToSexp Dependency where
 instance ToSexp Sexp where
     toSexp = id
 
+instance ToSexp Bool where
+    toSexp b = SSymbol $ if b then "t" else "nil"
+
 cons :: (ToSexp a, ToSexp b) => a -> [b] -> Sexp
 cons h t = SList (toSexp h : map toSexp t)
 
@@ -300,6 +307,7 @@ dumpPackageDescription pkgDesc projectDir = do
             , cons (sym "dependencies") deps
             , cons (sym "other-options") (cppOpts ++ ghcOpts)
             , cons (sym "autogen-directories") (map normalise autogenDirs)
+            , cons (sym "should-include-version-header") [not ghcIncludesVersionMacro]
             ]
   where
     buildInfo :: [BuildInfo]
@@ -560,6 +568,14 @@ cabalVersion' =
     CabalVersion.showVersion cabalVersion
 #else
     showVersion cabalVersion
+#endif
+
+ghcIncludesVersionMacro :: Bool
+ghcIncludesVersionMacro =
+#if defined(GHC_INCLUDES_VERSION_MACRO)
+    True
+#else
+    False
 #endif
 
 ordNub :: forall a. Ord a => [a] -> [a]

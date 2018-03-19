@@ -305,7 +305,8 @@ buffer."
                  (append .other-options
                          (seq-map (apply-partially #'concat "-I")
                                   .autogen-directories)
-                         '("-optP-include" "-optPcabal_macros.h")
+                         (when (car .should-include-version-header)
+                           '("-optP-include" "-optPcabal_macros.h"))
                          (cons "-hide-all-packages"
                                (seq-map (apply-partially #'concat "-package=")
                                         .dependencies))
