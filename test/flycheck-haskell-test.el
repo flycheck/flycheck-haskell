@@ -229,7 +229,7 @@ using directory separator."
       (should (equal .extensions '("OverloadedStrings")))
       (should (equal .languages '("Haskell2010")))
       (should (equal .other-options nil))
-      (should (equal .source-directories '("lib/"))))))
+      (should (equal .source-directories (list (expand-file-name "lib/" test-dir)))))))
 
 
 ;;; Configuration caching
