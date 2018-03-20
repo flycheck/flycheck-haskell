@@ -224,12 +224,14 @@ using directory separator."
          (default-directory test-dir))
     (cl-assert (file-regular-p (expand-file-name "foo.cabal" test-dir)))
     (flycheck-haskell-read-cabal-configuration "foo.cabal")
-    (let-alist (flycheck-haskell-read-cabal-configuration "foo.cabal")
-      (should (equal .dependencies '("base")))
-      (should (equal .extensions '("OverloadedStrings")))
-      (should (equal .languages '("Haskell2010")))
-      (should (equal .other-options nil))
-      (should (equal .source-directories (list (expand-file-name "lib/" test-dir)))))))
+    (let ((conf (flycheck-haskell-read-cabal-configuration "foo.cabal")))
+      (let-alist conf
+        (should (equal .dependencies '("base")))
+        (should (equal .extensions '("OverloadedStrings")))
+        (should (equal .languages '("Haskell2010")))
+        (should (member "-Wall" .other-options))
+        (should (member "-fwarn-haha-no-such-option" .other-options))
+        (should (equal .source-directories (list (expand-file-name "lib/" test-dir))))))))
 
 
 ;;; Configuration caching
