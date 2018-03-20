@@ -9,4 +9,4 @@
  "get-cabal-configuration.hs")
 
 (development
- (depends-on "cl-lib" "dash"))
+ (depends-on "cl-lib"))

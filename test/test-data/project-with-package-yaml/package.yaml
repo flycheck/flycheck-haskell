@@ -1,0 +1,42 @@
+name: flycheck-haskell-hpack-test
+version: 0.0.0.2
+category: "Test"
+synopsis:    Testing how flycheck works with hpack's package.yaml
+license: "BSD3"
+author: "Sergey Vinokurov"
+
+ghc-options: -Wall -fwarn-name-shadowing -Werror
+
+extra-source-files:
+  - docs/*
+
+dependencies:
+  - base == 4.*
+  - vector
+
+library:
+  source-dirs:
+    - lib/
+  exposed-modules:
+    - Test1
+    - Test2
+  cpp-options:
+    - "-DDEBUG=1"
+  default-extensions: OverloadedStrings
+
+executables:
+  flycheck-haskell-test:
+    source-dirs: "src/"
+    main: Test.hs
+    default-extensions: GeneralizedNewtypeDeriving
+    dependencies:
+      - base >=4.7 && <4.8
+      - bytestring
+    ghc-options:         -Wcompat
+
+  flycheck-haskell-unknown-stuff:
+    main: FlycheckUnknown.hs
+    # This shall test the handling of unknown language and extension values
+    dependencies: base >=4.7 && <4.8
+    default-extensions:          YouDontKnowThisOne
+

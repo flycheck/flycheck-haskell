@@ -1,5 +1,6 @@
 ;;; flycheck-haskell.el --- Flycheck: Automatic Haskell configuration -*- lexical-binding: t; -*-
 
+;; Copyright (C) 2016-2018 Sergey Vinokurov <serg.foo@gmail.com>
 ;; Copyright (C) 2014-2016 Sebastian Wiesner <swiesner@lunaryorn.com>
 ;; Copyright (C) 2016 Danny Navarro
 ;; Copyright (C) 2015 Mark Karpov <markkarpov@opmbx.org>
@@ -73,9 +74,16 @@
   :link '(url-link :tag "Github" "https://github.com/flycheck/flycheck-haskell"))
 
 (defcustom flycheck-haskell-runghc-command
-  (if (funcall flycheck-executable-find "stack")
-      '("stack" "--verbosity" "silent" "runghc" "--no-ghc-package-path" "--" "--ghc-arg=-i")
-    `(,(funcall flycheck-executable-find "runghc") "-i"))
+  (let ((stack-exe (funcall flycheck-executable-find "stack"))
+        (runghc-exe (funcall flycheck-executable-find "runghc")))
+    (cond
+      (stack-exe
+       `(,stack-exe "--verbosity" "silent" "runghc" "--no-ghc-package-path" "--" "--ghc-arg=-i"))
+      (runghc-exe
+       `(,runghc-exe "-i"))
+      (t
+       ;; A reasonable default.
+       '("runghc" "-i"))))
   "Command for `runghc'.
 
 This library uses `runghc' to run various Haskell helper scripts
@@ -85,6 +93,29 @@ and otherwise fall back to standard `runghc'."
   :type '(repeat (string :tag "Command"))
   :risky t
   :group 'flycheck-haskell)
+
+(defcustom flycheck-haskell-hpack-executable (funcall flycheck-executable-find "hpack")
+  "Path to the `hpack' executable.
+
+This library uses `hpack' to get package configuration if `package.yaml' file
+is present.  This option provides the path to the `hpack' executable.  The nil
+value will make this library ignore `package.yaml' file, even if it's present."
+  :type 'string
+  :risky t
+  :group 'flycheck-haskell)
+
+(defcustom flycheck-haskell-hpack-preference 'prefer-hpack
+  "How to handle projects with both `.cabal' and `package.yaml' files present.
+
+This option controls which configuration file this library will pick for
+a projcet that has both `.cabal' and `package.yaml' files present.
+The default, 'prefer-hpack, will make it pick `package.yaml' file as the source
+of configuration parameters.  Another possible value, 'prefer-cabal will
+make it pick `.cabal' file in such a case."
+  :group 'flycheck-haskell
+  :type '(set (const :tag "Prefer hpack's \"package.yaml\" file" prefer-hpack)
+              (const :tag "Prefer cabal's \".cabal\" file" prefer-cabal))
+  :safe #'symbolp)
 
 
 ;;; Cabal support
@@ -98,35 +129,35 @@ and otherwise fall back to standard `runghc'."
   (expand-file-name "get-cabal-configuration.hs" flycheck-haskell-directory)
   "The helper to dump the Cabal configuration.")
 
-(defconst flycheck-haskell-flags-helper
-  (expand-file-name "get-flags.hs" flycheck-haskell-directory)
-  "The helper to get compiler flags for the Cabal helper.")
-
 (defun flycheck-haskell-runghc-command (args)
   "Create a runghc command with ARGS.
 
 Take the base command from `flycheck-haskell-runghc-command'."
   (append flycheck-haskell-runghc-command args nil))
 
-(defun flycheck-haskell--get-flags ()
-  "Get GHC flags to run the Cabal helper."
-  (ignore-errors
-    (apply #'process-lines
-           (flycheck-haskell-runghc-command
-            (list flycheck-haskell-flags-helper)))))
+(defun flycheck-haskell--read-configuration-with-helper (command)
+  (with-temp-buffer
+    (pcase (apply 'call-process (car command) nil t nil (cdr command))
+      (0 (goto-char (point-min))
+         (read (current-buffer)))
+      (retcode (message "Reading Haskell configuration failed with exit code %s and output:\n%s"
+                        retcode (buffer-string))
+               nil))))
 
 (defun flycheck-haskell-read-cabal-configuration (cabal-file)
   "Read the Cabal configuration from CABAL-FILE."
-  (let* ((args (append (flycheck-haskell--get-flags)
-                       (list flycheck-haskell-helper cabal-file)))
-         (command (flycheck-haskell-runghc-command args)))
-    (with-temp-buffer
-      (pcase (apply 'call-process (car command) nil t nil (cdr command))
-        (0 (goto-char (point-min))
-           (read (current-buffer)))
-        (retcode (message "Reading Haskell configuration failed with exit code %s and output:\n%s"
-                          retcode (buffer-string))
-                 nil)))))
+  (let ((args (list flycheck-haskell-helper "--cabal-file" (expand-file-name cabal-file))))
+    (flycheck-haskell--read-configuration-with-helper
+     (flycheck-haskell-runghc-command args))))
+
+(defun flycheck-haskell-read-hpack-configuration (hpack-file)
+  "Read the hpack configuration from HPACK-FILE."
+  (cl-assert flycheck-haskell-hpack-executable)
+  (let ((args (list flycheck-haskell-helper
+                    "--hpack-exe" flycheck-haskell-hpack-executable
+                    "--hpack-file" (expand-file-name hpack-file))))
+    (flycheck-haskell--read-configuration-with-helper
+     (flycheck-haskell-runghc-command args))))
 
 (defun flycheck-haskell--delete-dups (xs)
   "Remove duplicates from a list XS using `equal'. Leaves initial
@@ -147,40 +178,42 @@ time of the cabal file, and CONFIG the extracted configuration.")
   (interactive)
   (clrhash flycheck-haskell-config-cache))
 
-(defun flycheck-haskell-get-cached-configuration (cabal-file)
+(defun flycheck-haskell-get-cached-configuration (config-file)
   "Get the cached configuration for CABAL-FILE.
 
 Return the cached configuration, or nil, if there is no cache
 entry, or if the cache entry is outdated."
-  (pcase-let* ((cache-entry (gethash cabal-file flycheck-haskell-config-cache))
+  (pcase-let* ((cache-entry (gethash config-file flycheck-haskell-config-cache))
                (`(,modtime . ,config) cache-entry))
-    (when (and modtime (file-exists-p cabal-file))
-      (let ((current-modtime (nth 5 (file-attributes cabal-file))))
+    (when (and modtime (file-exists-p config-file))
+      (let ((current-modtime (nth 5 (file-attributes config-file))))
         (if (time-less-p modtime current-modtime)
             ;; The entry is outdated, drop it.  `remhash' always
             ;; returns nil, so we are safe to use it here.
-            (remhash cabal-file flycheck-haskell-config-cache)
+            (remhash config-file flycheck-haskell-config-cache)
           ;; The configuration is up to date, use it
           config)))))
 
-(defun flycheck-haskell-read-and-cache-configuration (cabal-file)
+(defun flycheck-haskell-read-and-cache-configuration (config-file)
   "Read and cache configuration from CABAL-FILE.
 
 Return the configuration."
-  (let ((modtime (nth 5 (file-attributes cabal-file)))
-        (config (flycheck-haskell-read-cabal-configuration cabal-file)))
-    (puthash cabal-file (cons modtime config) flycheck-haskell-config-cache)
+  (let ((modtime (nth 5 (file-attributes config-file)))
+        (config (if (equal "yaml" (file-name-extension config-file))
+                    (flycheck-haskell-read-hpack-configuration config-file)
+                  (flycheck-haskell-read-cabal-configuration config-file))))
+    (puthash config-file (cons modtime config) flycheck-haskell-config-cache)
     config))
 
-(defun flycheck-haskell-get-configuration (cabal-file)
+(defun flycheck-haskell-get-configuration (config-file)
   "Get the Cabal configuration from CABAL-FILE.
 
 Get the configuration either from our cache, or by reading the
 CABAL-FILE.
 
 Return the configuration."
-  (or (flycheck-haskell-get-cached-configuration cabal-file)
-      (flycheck-haskell-read-and-cache-configuration cabal-file)))
+  (or (flycheck-haskell-get-cached-configuration config-file)
+      (flycheck-haskell-read-and-cache-configuration config-file)))
 
 
 ;;; Cabal sandbox support
@@ -211,8 +244,9 @@ KEY is a symbol denoting the key whose value to get.  Return
 a `(KEY . VALUE)' cons cell."
   (save-excursion
     (goto-char (point-min))
-    (-when-let (setting (haskell-cabal--get-field (symbol-name key)))
-      (cons key (substring-no-properties setting)))))
+    (let ((setting (haskell-cabal--get-field (symbol-name key))))
+      (when setting
+        (cons key (substring-no-properties setting))))))
 
 (defun flycheck-haskell-parse-config-file (keys config-file)
   "Parse KEYS from CONFIG-FILE.
@@ -227,28 +261,31 @@ KEYS."
 
 Return the absolute path of CONFIG-FILE as string, or nil if
 CONFIG-FILE was not found."
-  (-when-let (root-dir (locate-dominating-file (buffer-file-name) config-file))
-    (expand-file-name config-file root-dir)))
+  (let ((root-dir (locate-dominating-file (buffer-file-name) config-file)))
+    (when root-dir
+      (expand-file-name config-file root-dir))))
 
 (defun flycheck-haskell-get-cabal-config ()
   "Get Cabal configuration for the current buffer.
 
 Return an alist with the Cabal configuration for the current
 buffer."
-  (-when-let (file-name (flycheck-haskell-find-config
-                         flycheck-haskell-cabal-config))
-    (flycheck-haskell-parse-config-file flycheck-haskell-cabal-config-keys
-                                        file-name)))
+  (let ((file-name (flycheck-haskell-find-config
+                    flycheck-haskell-cabal-config)))
+    (when file-name
+      (flycheck-haskell-parse-config-file flycheck-haskell-cabal-config-keys
+                                          file-name))))
 
 (defun flycheck-haskell-get-sandbox-config ()
   "Get sandbox configuration for the current buffer.
 
 Return an alist with the sandbox configuration for the current
 buffer."
-  (-when-let (file-name (flycheck-haskell-find-config
-                         flycheck-haskell-sandbox-config))
-    (flycheck-haskell-parse-config-file flycheck-haskell-sandbox-config-keys
-                                        file-name)))
+  (let ((file-name (flycheck-haskell-find-config
+                    flycheck-haskell-sandbox-config)))
+    (when file-name
+      (flycheck-haskell-parse-config-file flycheck-haskell-sandbox-config-keys
+                                          file-name))))
 
 
 ;;; Buffer setup
@@ -268,7 +305,8 @@ buffer."
                  (append .other-options
                          (seq-map (apply-partially #'concat "-I")
                                   .autogen-directories)
-                         '("-optP-include" "-optPcabal_macros.h")
+                         (when (car .should-include-version-header)
+                           '("-optP-include" "-optPcabal_macros.h"))
                          (cons "-hide-all-packages"
                                (seq-map (apply-partially #'concat "-package=")
                                         .dependencies))
@@ -283,9 +321,11 @@ buffer."
   "Set paths and package database for the current project."
   (interactive)
   (when (and (buffer-file-name) (file-directory-p default-directory))
-    (-when-let* ((cabal-file (haskell-cabal-find-file))
-                 (config (flycheck-haskell-get-configuration cabal-file)))
-      (flycheck-haskell-process-configuration config))
+    (let ((config-file (flycheck-haskell--find-config-file)))
+      (when config-file
+        (let ((config (flycheck-haskell-get-configuration config-file)))
+          (when config
+            (flycheck-haskell-process-configuration config)))))
 
     (let-alist (flycheck-haskell-get-cabal-config)
       (when .with-compiler
@@ -297,6 +337,24 @@ buffer."
                     (flycheck-haskell--delete-dups
                      (cons .package-db flycheck-ghc-package-databases)))
         (setq-local flycheck-ghc-no-user-package-database t)))))
+
+(defun flycheck-haskell--find-config-file ()
+  (let* ((cabal-file (haskell-cabal-find-file))
+         (hpack-dir
+          (and flycheck-haskell-hpack-executable
+               (locate-dominating-file default-directory "package.yaml")))
+         (hpack-file
+          (when hpack-dir
+            (concat hpack-dir "/package.yaml"))))
+    (if cabal-file
+        (if hpack-file
+            (cond
+              ((eq 'prefer-hpack flycheck-haskell-hpack-preference)
+               hpack-file)
+              (t
+               cabal-file))
+          cabal-file)
+      hpack-file)))
 
 ;;;###autoload
 (defun flycheck-haskell-setup ()

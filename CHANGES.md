@@ -6,6 +6,7 @@ master (in development)
 - Fix obtaining configuration from cabal file if current directory has Prelude module in it [GH-70]
 - Get correct location of stack’s dist directory. Fixes the case when GHC was installed via stack [GH-73]
 - Improve `flycheck-haskell-setup` to perform initialization the first time a Haskell file is opened [https://github.com/flycheck/flycheck/issues/1346]
+- Support `hpack` package description format [GH-85]
 
 0.8 (May 24, 2016)
 ==================
