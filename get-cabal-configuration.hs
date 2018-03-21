@@ -263,9 +263,7 @@ getSourceDirectories buildInfo cabalDir =
 
 allowedOptions :: Set String
 allowedOptions = S.fromList
-    [ "-W"
-    , "-w"
-    , "-Wall"
+    [ "-w"
     , "-fglasgow-exts"
     , "-fpackage-trust"
     , "-fhelpful-errors"
@@ -277,6 +275,7 @@ allowedOptionPrefixes :: [String]
 allowedOptionPrefixes =
     [ "-fwarn-"
     , "-fno-warn-"
+    , "-W"
     , "-fcontext-stack="
     , "-firrefutable-tuples"
     , "-D"
