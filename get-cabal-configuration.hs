@@ -33,7 +33,9 @@ module Main (main) where
 #endif
 
 #if defined(GHC_INCLUDES_VERSION_MACRO)
-# if MIN_VERSION_Cabal(2, 2, 0)
+# if MIN_VERSION_Cabal(2, 3, 0)
+#  define Cabal24 1
+# elif MIN_VERSION_Cabal(2, 2, 0)
 #  define Cabal22 1
 # elif MIN_VERSION_Cabal(2, 0, 0)
 #  define Cabal20 1
@@ -42,6 +44,7 @@ module Main (main) where
 -- Hack - we may actually be using Cabal 2.0 with e.g. 7.8 GHC. But
 -- that's not likely to occur for average user who's relying on
 -- packages bundled with GHC. The 2.0 Cabal is bundled starting with 8.2.1.
+# undef Cabal24
 # undef Cabal22
 # undef Cabal20
 
@@ -64,7 +67,7 @@ module Main (main) where
 import qualified Control.Applicative as A
 import Control.Exception (SomeException, try)
 import Control.Monad (when)
-#if defined(Cabal22)
+#if defined(Cabal22) || defined(Cabal24)
 import qualified Data.ByteString as BS
 #endif
 import Data.Char (isSpace)
@@ -104,11 +107,15 @@ import System.IO (Handle, hGetContents, hPutStrLn, stderr)
 import System.Process (readProcessWithExitCode)
 import qualified System.Process as Process
 
-#if __GLASGOW_HASKELL__ >= 710 && !defined(Cabal20) && !defined(Cabal22)
+#if __GLASGOW_HASKELL__ >= 710 && !defined(Cabal20) && !defined(Cabal22) && !defined(Cabal24)
 import Data.Version (Version)
 #endif
 
-#if defined(Cabal20) || defined(Cabal22)
+#if defined(Cabal24)
+import Distribution.PackageDescription (allBuildDepends)
+#endif
+
+#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
 import Control.Monad (filterM)
 import Distribution.Package (unPackageName, depPkgName, PackageName)
 import Distribution.PackageDescription.Configuration (finalizePD)
@@ -136,12 +143,12 @@ import Distribution.PackageDescription
 
 #endif
 
-#if defined(Cabal22)
+#if defined(Cabal22) || defined(Cabal24)
 import Distribution.Pretty (prettyShow)
 import Distribution.Types.GenericPackageDescription (mkFlagAssignment)
 #endif
 
-#if defined(Cabal22)
+#if defined(Cabal22) || defined(Cabal24)
 import Distribution.PackageDescription.Parsec
        (runParseResult, readGenericPackageDescription, parseGenericPackageDescription)
 import Distribution.Parsec.Common (showPError)
@@ -186,7 +193,7 @@ instance ToSexp Language where
     toSexp lang = toSexp (show lang)
 
 instance ToSexp Dependency where
-#if defined(Cabal20) || defined(Cabal22)
+#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
     toSexp = toSexp . unPackageName . depPkgName
 #else
     toSexp (Dependency (PackageName dependency) _) = toSexp dependency
@@ -321,7 +328,7 @@ dumpPackageDescription pkgDesc projectDir = do
     thisPackage = pkgName (package pkgDesc)
     deps :: [Dependency]
     deps =
-        nub (filter (\(Dependency name _) -> name /= thisPackage) (buildDepends pkgDesc))
+        nub (filter (\(Dependency name _) -> name /= thisPackage) (buildDepends' pkgDesc))
     -- The "cpp-options" configuration field.
     cppOpts :: [String]
     cppOpts =
@@ -367,9 +374,17 @@ readHPackPkgDescr exe configFile projectDir = do
         , Process.cwd     = Just projectDir
         }
 
+buildDepends' :: PackageDescription -> [Dependency]
+buildDepends' =
+#if defined(Cabal24)
+    allBuildDepends
+#else
+    buildDepends
+#endif
+
 readGenericPkgDescr :: FilePath -> IO GenericPackageDescription
 readGenericPkgDescr =
-#if defined(Cabal20) || defined(Cabal22)
+#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
     readGenericPackageDescription silent
 #else
     readPackageDescription silent
@@ -377,7 +392,7 @@ readGenericPkgDescr =
 
 newtype CabalFileContents = CabalFileContents
     { unCabalFileContents ::
-#if defined(Cabal22)
+#if defined(Cabal22) || defined(Cabal24)
         BS.ByteString
 #else
         String
@@ -387,7 +402,7 @@ newtype CabalFileContents = CabalFileContents
 readCabalFileContentsFromHandle :: Handle -> IO CabalFileContents
 readCabalFileContentsFromHandle =
     fmap CabalFileContents .
-#if defined(Cabal22)
+#if defined(Cabal22) || defined(Cabal24)
         BS.hGetContents
 #else
         hGetContents
@@ -395,7 +410,7 @@ readCabalFileContentsFromHandle =
 
 parsePkgDescr :: FilePath -> CabalFileContents -> Either [String] GenericPackageDescription
 parsePkgDescr _fileName cabalFileContents =
-#if defined(Cabal22)
+#if defined(Cabal22) || defined(Cabal24)
     case runParseResult $ parseGenericPackageDescription $ unCabalFileContents cabalFileContents of
         (_warnings, res) ->
             case res of
@@ -419,7 +434,7 @@ getConcretePackageDescription
     :: GenericPackageDescription
     -> Either [Dependency] PackageDescription
 getConcretePackageDescription genericDesc = do
-#if defined(Cabal22)
+#if defined(Cabal22) || defined(Cabal24)
     let enabled :: ComponentRequestedSpec
         enabled = ComponentRequestedSpec
             { testsRequested      = True
@@ -491,7 +506,7 @@ getConcretePackageDescription genericDesc = do
 #endif
 
 componentsAutogenDirs :: FilePath -> [String] -> IO [FilePath]
-#if defined(Cabal20) || defined(Cabal22)
+#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
 componentsAutogenDirs buildDir componentNames =
         filterM doesDirectoryExist $
             map (\path -> buildDir </> path </> "autogen") componentNames
@@ -508,7 +523,7 @@ buildCompilerId = unknownCompilerInfo compId NoAbiTag
   where
     compId :: CompilerId
     compId = CompilerId buildCompilerFlavor compVersion
-# if defined(Cabal20) || defined(Cabal22)
+# if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
     compVersion :: CabalVersion.Version
     compVersion = CabalVersion.mkVersion' compilerVersion
 # else
@@ -523,7 +538,7 @@ getExeNames =
   where
     getExeName :: Executable -> FilePath
     getExeName =
-#if defined(Cabal20) || defined(Cabal22)
+#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
         unUnqualComponentName . exeName
 #else
         exeName
@@ -535,7 +550,7 @@ getTestNames =
   where
     getTestName :: TestSuite -> FilePath
     getTestName =
-#if defined(Cabal20) || defined(Cabal22)
+#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
         unUnqualComponentName . testName
 #else
         testName
@@ -548,7 +563,7 @@ getBenchmarkNames =
   where
     getBenchName :: Benchmark -> FilePath
     getBenchName =
-# if defined(Cabal20) || defined(Cabal22)
+# if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
         unUnqualComponentName . benchmarkName
 # else
         benchmarkName
@@ -561,7 +576,7 @@ getBenchmarkNames =
 -- Textual representation of cabal version
 cabalVersion' :: String
 cabalVersion' =
-#if defined(Cabal22)
+#if defined(Cabal22) || defined(Cabal24)
     prettyShow cabalVersion
 #elif defined(Cabal20)
     CabalVersion.showVersion cabalVersion
