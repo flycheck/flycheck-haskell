@@ -7,6 +7,7 @@ master (in development)
 - Get correct location of stack’s dist directory. Fixes the case when GHC was installed via stack [GH-73]
 - Improve `flycheck-haskell-setup` to perform initialization the first time a Haskell file is opened [https://github.com/flycheck/flycheck/issues/1346]
 - Support `hpack` package description format [GH-85]
+- Properly collect options from foreign library sections available starting with Cabal 2.0
 
 0.8 (May 24, 2016)
 ==================

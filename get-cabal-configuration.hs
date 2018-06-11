@@ -120,6 +120,7 @@ import Control.Monad (filterM)
 import Distribution.Package (unPackageName, depPkgName, PackageName)
 import Distribution.PackageDescription.Configuration (finalizePD)
 import Distribution.Types.ComponentRequestedSpec (ComponentRequestedSpec(..))
+import Distribution.Types.ForeignLib (ForeignLib(foreignLibName))
 import Distribution.Types.UnqualComponentName (unUnqualComponentName)
 import qualified Distribution.Version as CabalVersion
 import Distribution.Types.Benchmark (Benchmark(benchmarkName))
@@ -238,7 +239,8 @@ getBuildDirectories tool pkgDesc cabalDir = do
         componentNames =
             getExeNames pkgDesc ++
             getTestNames pkgDesc ++
-            getBenchmarkNames pkgDesc
+            getBenchmarkNames pkgDesc ++
+            getForeignLibNames pkgDesc
 
     autogenDirs <- getAutogenDirs buildDir componentNames
 
@@ -543,6 +545,19 @@ getExeNames =
 #else
         exeName
 #endif
+
+getForeignLibNames :: PackageDescription -> [String]
+getForeignLibNames =
+#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
+    map getForeignLibName . foreignLibs
+  where
+    getForeignLibName :: ForeignLib -> FilePath
+    getForeignLibName =
+        unUnqualComponentName . foreignLibName
+#else
+    const []
+#endif
+
 
 getTestNames :: PackageDescription -> [String]
 getTestNames =
