@@ -15,8 +15,7 @@ Install `flycheck-haskell` from [MELPA][] or [MELPA Stable][] and add the
 following to your `init.el`:
 
 ```cl
-(eval-after-load 'flycheck
-  '(add-hook 'flycheck-mode-hook #'flycheck-haskell-setup))
+(add-hook 'haskell-mode-hook #'flycheck-haskell-setup)
 ```
 
 Supported GHC versions
