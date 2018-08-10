@@ -1,6 +1,6 @@
 -- Copyright (C) 2016-2018 Sergey Vinokurov <serg.foo@gmail.com>
 -- Copyright (C) 2014-2016 Sebastian Wiesner <swiesner@lunaryorn.com>
--- Copyright (C) 2016 Danny Navarro
+-- Copyright (C) 2016-2018 Danny Navarro <j@dannynavarro.net>
 -- Copyright (C) 2015 Mark Karpov <markkarpov@opmbx.org>
 -- Copyright (C) 2015 Michael Alan Dorman <mdorman@ironicdesign.com>
 -- Copyright (C) 2014 Gracjan Polak <gracjanpolak@gmail.com>
@@ -125,6 +125,7 @@ import Distribution.Types.UnqualComponentName (unUnqualComponentName)
 import qualified Distribution.Version as CabalVersion
 import Distribution.Types.Benchmark (Benchmark(benchmarkName))
 import Distribution.Types.TestSuite (TestSuite(testName))
+import Distribution.Types.PackageId (PackageId)
 import System.Directory (doesDirectoryExist)
 #else
 import Control.Arrow (second)
@@ -168,7 +169,7 @@ data Sexp
     | SString String
     | SSymbol String
 
-data TargetTool = Cabal | Stack
+data TargetTool = CabalNew PackageId | Cabal | Stack
 
 sym :: String -> Sexp
 sym = SSymbol
@@ -211,6 +212,14 @@ cons h t = SList (toSexp h : map toSexp t)
 
 -- | Get possible dist directory
 distDir :: TargetTool -> IO FilePath
+distDir (CabalNew packageId) = do
+    res <- try $ readProcessWithExitCode "cabal" ["new-exec", "ghc", "--", "--numeric-version"] []
+    return $ case res of
+        Left (_ :: SomeException)      -> mempty
+        Right (ExitSuccess, stdOut, _) -> "dist-newstyle/build" </> display buildPlatform
+                                                                </> "ghc-" ++ stripWhitespace stdOut
+                                                                </> display packageId
+        Right (ExitFailure _, _, _)    -> mempty
 distDir Cabal = return defaultDistPref
 distDir Stack = do
     res <- try $ readProcessWithExitCode "stack" ["path", "--dist-dir"] []
@@ -248,10 +257,18 @@ getBuildDirectories tool pkgDesc cabalDir = do
         componentBuildDir componentName =
             buildDir </> componentName </> (componentName ++ "-tmp")
 
+        newComponentBuildDir :: String -> FilePath
+        newComponentBuildDir componentName =
+            cabalDir </> distDir'
+                     </> "build"
+                     </> componentName
+                     </> (componentName ++ "-tmp")
+
         buildDirs :: [FilePath]
         buildDirs =
             autogenDirs ++
-            map componentBuildDir componentNames
+            map componentBuildDir componentNames ++
+            map newComponentBuildDir componentNames
 
         buildDirs' = case library pkgDesc of
             Just _  -> buildDir : buildDirs
@@ -302,10 +319,11 @@ isAllowedOption opt =
 
 dumpPackageDescription :: PackageDescription -> FilePath -> IO Sexp
 dumpPackageDescription pkgDesc projectDir = do
+    (cabalNewDirs, cabalNewAutogen) <- getBuildDirectories (CabalNew $ package pkgDesc) pkgDesc projectDir
     (cabalDirs, cabalAutogen) <- getBuildDirectories Cabal pkgDesc projectDir
     (stackDirs, stackAutogen) <- getBuildDirectories Stack pkgDesc projectDir
-    let buildDirs   = cabalDirs ++ stackDirs
-        autogenDirs = cabalAutogen ++ stackAutogen
+    let buildDirs   = cabalNewDirs ++ cabalDirs ++ stackDirs
+        autogenDirs = cabalNewAutogen ++ cabalAutogen ++ stackAutogen
     return $
         SList
             [ cons (sym "build-directories") (ordNub (map normalise buildDirs))
@@ -320,21 +338,28 @@ dumpPackageDescription pkgDesc projectDir = do
   where
     buildInfo :: [BuildInfo]
     buildInfo = allBuildInfo pkgDesc
+
     sourceDirs :: [FilePath]
     sourceDirs = ordNub (map normalise (getSourceDirectories buildInfo projectDir))
+
     exts :: [Extension]
     exts = nub (concatMap usedExtensions buildInfo)
+
     langs :: [Language]
     langs = nub (concatMap allLanguages buildInfo)
+
     thisPackage :: PackageName
     thisPackage = pkgName (package pkgDesc)
+
     deps :: [Dependency]
     deps =
         nub (filter (\(Dependency name _) -> name /= thisPackage) (buildDepends' pkgDesc))
+
     -- The "cpp-options" configuration field.
     cppOpts :: [String]
     cppOpts =
         ordNub (filter isAllowedOption (concatMap cppOptions buildInfo))
+
     -- The "ghc-options" configuration field.
     ghcOpts :: [String]
     ghcOpts =

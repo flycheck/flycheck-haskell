@@ -80,7 +80,13 @@
       (stack-exe
        `(,stack-exe "--verbosity" "silent" "runghc" "--no-ghc-package-path" "--" "--ghc-arg=-i"))
       (runghc-exe
-       `(,runghc-exe "-i"))
+       ;; Dependencies needed by get-cabal-configuration.hs
+       `(,runghc-exe "--ghc-arg=-i"
+                     "--ghc-arg=-packageCabal"
+                     "--ghc-arg=-packagebytestring"
+                     "--ghc-arg=-packageprocess"
+                     "--ghc-arg=-packagedirectory"
+                     "--ghc-arg=-packagefilepath"))
       (t
        ;; A reasonable default.
        '("runghc" "-i"))))
