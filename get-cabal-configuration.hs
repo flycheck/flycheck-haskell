@@ -85,8 +85,10 @@ import Distribution.Compiler
        (AbiTag(NoAbiTag), CompilerFlavor(GHC), CompilerId(CompilerId),
         CompilerInfo, buildCompilerFlavor, unknownCompilerInfo)
 #endif
-import Distribution.Package
-       (pkgName, Dependency(..))
+#if __GLASGOW_HASKELL__ < 800
+import Distribution.Package (pkgName)
+#endif
+import Distribution.Package (Dependency(..))
 import Distribution.PackageDescription
        (GenericPackageDescription,
         PackageDescription(..), allBuildInfo, BuildInfo(..),
@@ -117,7 +119,10 @@ import Distribution.PackageDescription (allBuildDepends)
 
 #if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
 import Control.Monad (filterM)
-import Distribution.Package (unPackageName, depPkgName, PackageName)
+import Distribution.Package (unPackageName, depPkgName)
+#if __GLASGOW_HASKELL__ < 800
+import Distribution.Package (PackageName)
+#endif
 import Distribution.PackageDescription.Configuration (finalizePD)
 import Distribution.Types.ComponentRequestedSpec (ComponentRequestedSpec(..))
 import Distribution.Types.ForeignLib (ForeignLib(foreignLibName))
@@ -330,7 +335,11 @@ dumpPackageDescription pkgDesc projectDir = do
             , cons (sym "source-directories") sourceDirs
             , cons (sym "extensions") exts
             , cons (sym "languages") langs
+#if __GLASGOW_HASKELL__ < 800
+            -- No need to specify dependencies with package environments.
+            -- https://downloads.haskell.org/~ghc/8.0.2/docs/html/users_guide/packages.html#package-environments
             , cons (sym "dependencies") deps
+#endif
             , cons (sym "other-options") (cppOpts ++ ghcOpts)
             , cons (sym "autogen-directories") (map normalise autogenDirs)
             , cons (sym "should-include-version-header") [not ghcIncludesVersionMacro]
@@ -348,12 +357,15 @@ dumpPackageDescription pkgDesc projectDir = do
     langs :: [Language]
     langs = nub (concatMap allLanguages buildInfo)
 
+#if __GLASGOW_HASKELL__ < 800
+
     thisPackage :: PackageName
     thisPackage = pkgName (package pkgDesc)
 
     deps :: [Dependency]
     deps =
         nub (filter (\(Dependency name _) -> name /= thisPackage) (buildDepends' pkgDesc))
+#endif
 
     -- The "cpp-options" configuration field.
     cppOpts :: [String]
@@ -401,12 +413,14 @@ readHPackPkgDescr exe configFile projectDir = do
         , Process.cwd     = Just projectDir
         }
 
+#if __GLASGOW_HASKELL__ < 800
 buildDepends' :: PackageDescription -> [Dependency]
 buildDepends' =
 #if defined(Cabal24)
     allBuildDepends
 #else
     buildDepends
+#endif
 #endif
 
 readGenericPkgDescr :: FilePath -> IO GenericPackageDescription

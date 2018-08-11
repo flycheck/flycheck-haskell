@@ -81,12 +81,15 @@
        `(,stack-exe "--verbosity" "silent" "runghc" "--no-ghc-package-path" "--" "--ghc-arg=-i"))
       (runghc-exe
        ;; Dependencies needed by get-cabal-configuration.hs
-       `(,runghc-exe "--ghc-arg=-i"
-                     "--ghc-arg=-packageCabal"
-                     "--ghc-arg=-packagebytestring"
-                     "--ghc-arg=-packageprocess"
-                     "--ghc-arg=-packagedirectory"
-                     "--ghc-arg=-packagefilepath"))
+       `(,runghc-exe "--"
+                     "-i"
+                     "-packageCabal"
+                     "-packagebase"
+                     "-packagebytestring"
+                     "-packagecontainers"
+                     "-packageprocess"
+                     "-packagedirectory"
+                     "-packagefilepath"))
       (t
        ;; A reasonable default.
        '("runghc" "-i"))))
@@ -143,7 +146,10 @@ Take the base command from `flycheck-haskell-runghc-command'."
 
 (defun flycheck-haskell--read-configuration-with-helper (command)
   (with-temp-buffer
-    (pcase (apply 'call-process (car command) nil t nil (cdr command))
+    ;; Discard stderr. When runghc loads a package environment it prints some
+    ;; info to the stderr. Apparently there is no GHC parameter to silence that
+    ;; message.
+    (pcase (apply 'call-process (car command) nil (list t nil) nil (cdr command))
       (0 (goto-char (point-min))
          (read (current-buffer)))
       (retcode (message "Reading Haskell configuration failed with exit code %s and output:\n%s"
@@ -313,9 +319,10 @@ buffer."
                                   .autogen-directories)
                          (when (car .should-include-version-header)
                            '("-optP-include" "-optPcabal_macros.h"))
-                         (cons "-hide-all-packages"
-                               (seq-map (apply-partially #'concat "-package=")
-                                        .dependencies))
+                         (when .dependencies
+                           (cons "-hide-all-packages"
+                                 (seq-map (apply-partially #'concat "-package=")
+                                          .dependencies)))
                          flycheck-ghc-args)))
     (setq-local flycheck-hlint-args
                 (flycheck-haskell--delete-dups
