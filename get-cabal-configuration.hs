@@ -1,6 +1,6 @@
 -- Copyright (C) 2016-2018 Sergey Vinokurov <serg.foo@gmail.com>
 -- Copyright (C) 2014-2016 Sebastian Wiesner <swiesner@lunaryorn.com>
--- Copyright (C) 2016 Danny Navarro
+-- Copyright (C) 2016-2018 Danny Navarro <j@dannynavarro.net>
 -- Copyright (C) 2015 Mark Karpov <markkarpov@opmbx.org>
 -- Copyright (C) 2015 Michael Alan Dorman <mdorman@ironicdesign.com>
 -- Copyright (C) 2014 Gracjan Polak <gracjanpolak@gmail.com>
@@ -85,8 +85,10 @@ import Distribution.Compiler
        (AbiTag(NoAbiTag), CompilerFlavor(GHC), CompilerId(CompilerId),
         CompilerInfo, buildCompilerFlavor, unknownCompilerInfo)
 #endif
-import Distribution.Package
-       (pkgName, Dependency(..))
+#if __GLASGOW_HASKELL__ < 800
+import Distribution.Package (pkgName)
+#endif
+import Distribution.Package (Dependency(..))
 import Distribution.PackageDescription
        (GenericPackageDescription,
         PackageDescription(..), allBuildInfo, BuildInfo(..),
@@ -117,7 +119,10 @@ import Distribution.PackageDescription (allBuildDepends)
 
 #if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
 import Control.Monad (filterM)
-import Distribution.Package (unPackageName, depPkgName, PackageName)
+import Distribution.Package (unPackageName, depPkgName)
+#if __GLASGOW_HASKELL__ < 800
+import Distribution.Package (PackageName)
+#endif
 import Distribution.PackageDescription.Configuration (finalizePD)
 import Distribution.Types.ComponentRequestedSpec (ComponentRequestedSpec(..))
 import Distribution.Types.ForeignLib (ForeignLib(foreignLibName))
@@ -125,6 +130,9 @@ import Distribution.Types.UnqualComponentName (unUnqualComponentName)
 import qualified Distribution.Version as CabalVersion
 import Distribution.Types.Benchmark (Benchmark(benchmarkName))
 import Distribution.Types.TestSuite (TestSuite(testName))
+#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
+import Distribution.Types.PackageId (PackageId)
+#endif
 import System.Directory (doesDirectoryExist)
 #else
 import Control.Arrow (second)
@@ -168,7 +176,11 @@ data Sexp
     | SString String
     | SSymbol String
 
+#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
+data TargetTool = CabalNew PackageId | Cabal | Stack
+#else
 data TargetTool = Cabal | Stack
+#endif
 
 sym :: String -> Sexp
 sym = SSymbol
@@ -211,6 +223,17 @@ cons h t = SList (toSexp h : map toSexp t)
 
 -- | Get possible dist directory
 distDir :: TargetTool -> IO FilePath
+
+#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
+distDir (CabalNew packageId) = do
+    res <- try $ readProcessWithExitCode "cabal" ["new-exec", "ghc", "--", "--numeric-version"] []
+    return $ case res of
+        Left (_ :: SomeException)      -> mempty
+        Right (ExitSuccess, stdOut, _) -> "dist-newstyle/build" </> display buildPlatform
+                                                                </> "ghc-" ++ stripWhitespace stdOut
+                                                                </> display packageId
+        Right (ExitFailure _, _, _)    -> mempty
+#endif
 distDir Cabal = return defaultDistPref
 distDir Stack = do
     res <- try $ readProcessWithExitCode "stack" ["path", "--dist-dir"] []
@@ -248,10 +271,18 @@ getBuildDirectories tool pkgDesc cabalDir = do
         componentBuildDir componentName =
             buildDir </> componentName </> (componentName ++ "-tmp")
 
+        newComponentBuildDir :: String -> FilePath
+        newComponentBuildDir componentName =
+            cabalDir </> distDir'
+                     </> "build"
+                     </> componentName
+                     </> (componentName ++ "-tmp")
+
         buildDirs :: [FilePath]
         buildDirs =
             autogenDirs ++
-            map componentBuildDir componentNames
+            map componentBuildDir componentNames ++
+            map newComponentBuildDir componentNames
 
         buildDirs' = case library pkgDesc of
             Just _  -> buildDir : buildDirs
@@ -302,17 +333,29 @@ isAllowedOption opt =
 
 dumpPackageDescription :: PackageDescription -> FilePath -> IO Sexp
 dumpPackageDescription pkgDesc projectDir = do
+#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
+    (cabalNewDirs, cabalNewAutogen) <- getBuildDirectories (CabalNew $ package pkgDesc) pkgDesc projectDir
+#endif
     (cabalDirs, cabalAutogen) <- getBuildDirectories Cabal pkgDesc projectDir
     (stackDirs, stackAutogen) <- getBuildDirectories Stack pkgDesc projectDir
+#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
+    let buildDirs   = cabalNewDirs ++ cabalDirs ++ stackDirs
+        autogenDirs = cabalNewAutogen ++ cabalAutogen ++ stackAutogen
+#else
     let buildDirs   = cabalDirs ++ stackDirs
         autogenDirs = cabalAutogen ++ stackAutogen
+#endif
     return $
         SList
             [ cons (sym "build-directories") (ordNub (map normalise buildDirs))
             , cons (sym "source-directories") sourceDirs
             , cons (sym "extensions") exts
             , cons (sym "languages") langs
+#if __GLASGOW_HASKELL__ < 800
+            -- No need to specify dependencies with package environments.
+            -- https://downloads.haskell.org/~ghc/8.0.2/docs/html/users_guide/packages.html#package-environments
             , cons (sym "dependencies") deps
+#endif
             , cons (sym "other-options") (cppOpts ++ ghcOpts)
             , cons (sym "autogen-directories") (map normalise autogenDirs)
             , cons (sym "should-include-version-header") [not ghcIncludesVersionMacro]
@@ -320,21 +363,31 @@ dumpPackageDescription pkgDesc projectDir = do
   where
     buildInfo :: [BuildInfo]
     buildInfo = allBuildInfo pkgDesc
+
     sourceDirs :: [FilePath]
     sourceDirs = ordNub (map normalise (getSourceDirectories buildInfo projectDir))
+
     exts :: [Extension]
     exts = nub (concatMap usedExtensions buildInfo)
+
     langs :: [Language]
     langs = nub (concatMap allLanguages buildInfo)
+
+#if __GLASGOW_HASKELL__ < 800
+
     thisPackage :: PackageName
     thisPackage = pkgName (package pkgDesc)
+
     deps :: [Dependency]
     deps =
         nub (filter (\(Dependency name _) -> name /= thisPackage) (buildDepends' pkgDesc))
+#endif
+
     -- The "cpp-options" configuration field.
     cppOpts :: [String]
     cppOpts =
         ordNub (filter isAllowedOption (concatMap cppOptions buildInfo))
+
     -- The "ghc-options" configuration field.
     ghcOpts :: [String]
     ghcOpts =
@@ -376,12 +429,14 @@ readHPackPkgDescr exe configFile projectDir = do
         , Process.cwd     = Just projectDir
         }
 
+#if __GLASGOW_HASKELL__ < 800
 buildDepends' :: PackageDescription -> [Dependency]
 buildDepends' =
 #if defined(Cabal24)
     allBuildDepends
 #else
     buildDepends
+#endif
 #endif
 
 readGenericPkgDescr :: FilePath -> IO GenericPackageDescription
