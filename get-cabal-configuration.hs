@@ -130,7 +130,9 @@ import Distribution.Types.UnqualComponentName (unUnqualComponentName)
 import qualified Distribution.Version as CabalVersion
 import Distribution.Types.Benchmark (Benchmark(benchmarkName))
 import Distribution.Types.TestSuite (TestSuite(testName))
+#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
 import Distribution.Types.PackageId (PackageId)
+#endif
 import System.Directory (doesDirectoryExist)
 #else
 import Control.Arrow (second)
@@ -174,7 +176,11 @@ data Sexp
     | SString String
     | SSymbol String
 
+#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
 data TargetTool = CabalNew PackageId | Cabal | Stack
+#else
+data TargetTool = Cabal | Stack
+#endif
 
 sym :: String -> Sexp
 sym = SSymbol
@@ -217,6 +223,8 @@ cons h t = SList (toSexp h : map toSexp t)
 
 -- | Get possible dist directory
 distDir :: TargetTool -> IO FilePath
+
+#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
 distDir (CabalNew packageId) = do
     res <- try $ readProcessWithExitCode "cabal" ["new-exec", "ghc", "--", "--numeric-version"] []
     return $ case res of
@@ -225,6 +233,7 @@ distDir (CabalNew packageId) = do
                                                                 </> "ghc-" ++ stripWhitespace stdOut
                                                                 </> display packageId
         Right (ExitFailure _, _, _)    -> mempty
+#endif
 distDir Cabal = return defaultDistPref
 distDir Stack = do
     res <- try $ readProcessWithExitCode "stack" ["path", "--dist-dir"] []
@@ -324,11 +333,18 @@ isAllowedOption opt =
 
 dumpPackageDescription :: PackageDescription -> FilePath -> IO Sexp
 dumpPackageDescription pkgDesc projectDir = do
+#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
     (cabalNewDirs, cabalNewAutogen) <- getBuildDirectories (CabalNew $ package pkgDesc) pkgDesc projectDir
+#endif
     (cabalDirs, cabalAutogen) <- getBuildDirectories Cabal pkgDesc projectDir
     (stackDirs, stackAutogen) <- getBuildDirectories Stack pkgDesc projectDir
+#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
     let buildDirs   = cabalNewDirs ++ cabalDirs ++ stackDirs
         autogenDirs = cabalNewAutogen ++ cabalAutogen ++ stackAutogen
+#else
+    let buildDirs   = cabalDirs ++ stackDirs
+        autogenDirs = cabalAutogen ++ stackAutogen
+#endif
     return $
         SList
             [ cons (sym "build-directories") (ordNub (map normalise buildDirs))
