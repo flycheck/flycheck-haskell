@@ -96,7 +96,9 @@ import Distribution.Simple.BuildPaths (defaultDistPref)
 import Distribution.Simple.Utils (cabalVersion)
 import Distribution.System (buildPlatform)
 import Distribution.Text (display)
+#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
 import Distribution.Types.PackageId (PackageId)
+#endif
 import Distribution.Verbosity (silent)
 import Language.Haskell.Extension (Extension(..),Language(..))
 import System.Console.GetOpt
@@ -126,7 +128,7 @@ import Distribution.Types.UnqualComponentName (unUnqualComponentName)
 import qualified Distribution.Version as CabalVersion
 import Distribution.Types.Benchmark (Benchmark(benchmarkName))
 import Distribution.Types.TestSuite (TestSuite(testName))
-import System.Directory (doesDirectoryExist)
+import System.Directory (doesDirectoryExist, doesFileExist)
 #else
 import Control.Arrow (second)
 import Data.Version (showVersion)
@@ -134,17 +136,15 @@ import Distribution.Package (PackageName(..))
 import Distribution.PackageDescription.Configuration
        (finalizePackageDescription, mapTreeData)
 
-#if Cabal114OrMore
+# if Cabal114OrMore
 import Distribution.PackageDescription
        (TestSuite(..), Benchmark(..), condTestSuites, condBenchmarks,
         benchmarkEnabled, testEnabled)
-#else
+# else
 import Distribution.PackageDescription
        (TestSuite(..), condTestSuites, testEnabled)
+# endif
 #endif
-#endif
-
-import System.Directory (doesFileExist)
 
 #if defined(Cabal22) || defined(Cabal24)
 import Distribution.Pretty (prettyShow)
@@ -170,9 +170,13 @@ data Sexp
     | SString String
     | SSymbol String
 
-data TargetTool = Cabal | Stack | CabalNew PackageId GhcVersion
+data TargetTool = Cabal | Stack
+#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
+                        | CabalNew PackageId GhcVersion
 
 type GhcVersion = String
+#endif
+
 
 sym :: String -> Sexp
 sym = SSymbol
@@ -228,10 +232,12 @@ distDir Stack = do
         ".stack-work" </> defaultDistPref
                       </> display buildPlatform
                       </> "Cabal-" ++ cabalVersion'
+#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
 distDir (CabalNew packageId ghcVersion) =
     return $ "dist-newstyle/build" </> display buildPlatform
                                    </> "ghc-" ++ ghcVersion
                                    </> display packageId
+#endif
 
 getBuildDirectories
     :: TargetTool
@@ -254,12 +260,16 @@ getBuildDirectories tool pkgDesc cabalDir = do
 
     let componentBuildDir :: String -> FilePath
         componentBuildDir componentName =
+#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
           case tool of
             CabalNew _ _ -> cabalDir </> distDir'
                                      </> "build"
                                      </> componentName
                                      </> (componentName ++ "-tmp")
             _ -> buildDir </> componentName </> (componentName ++ "-tmp")
+#else
+          buildDir </> componentName </> (componentName ++ "-tmp")
+#endif
 
         buildDirs :: [FilePath]
         buildDirs =
@@ -284,10 +294,12 @@ getSourceDirectories :: [BuildInfo] -> FilePath -> [String]
 getSourceDirectories buildInfo cabalDir =
     map (cabalDir </>) (concatMap hsSourceDirs buildInfo)
 
+#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
 doesPackageEnvExist :: GhcVersion -> FilePath -> IO Bool
 doesPackageEnvExist ghcVersion projectDir = doesFileExist $ projectDir </> packageEnvFn
   where
     packageEnvFn = ".ghc.environment." ++ display buildPlatform ++ "-" ++ ghcVersion
+#endif
 
 allowedOptions :: Set String
 allowedOptions = S.fromList
@@ -321,13 +333,18 @@ isAllowedOption opt =
 
 dumpPackageDescription :: PackageDescription -> FilePath -> IO Sexp
 dumpPackageDescription pkgDesc projectDir = do
-    ghcVersion <- getGhcVersion
     (cabalDirs, cabalAutogen) <- getBuildDirectories Cabal pkgDesc projectDir
     (stackDirs, stackAutogen) <- getBuildDirectories Stack pkgDesc projectDir
+#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
+    ghcVersion <- getGhcVersion
     (cabalNewDirs, cabalNewAutogen) <- getBuildDirectories (CabalNew (package pkgDesc) ghcVersion) pkgDesc projectDir
     packageEnvExists <- doesPackageEnvExist ghcVersion projectDir
     let buildDirs   = cabalDirs ++ stackDirs ++ cabalNewDirs
         autogenDirs = cabalAutogen ++ stackAutogen ++ cabalNewAutogen
+#else
+    let buildDirs   = cabalDirs ++ stackDirs
+        autogenDirs = cabalAutogen ++ stackAutogen
+#endif
     return $
         SList
             [ cons (sym "build-directories") (ordNub (map normalise buildDirs))
@@ -338,7 +355,9 @@ dumpPackageDescription pkgDesc projectDir = do
             , cons (sym "other-options") (cppOpts ++ ghcOpts)
             , cons (sym "autogen-directories") (map normalise autogenDirs)
             , cons (sym "should-include-version-header") [not ghcIncludesVersionMacro]
+#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
             , cons (sym "package-env-exists") [packageEnvExists]
+#endif
             ]
   where
     buildInfo :: [BuildInfo]
@@ -370,6 +389,7 @@ dumpPackageDescription pkgDesc projectDir = do
     ghcOpts =
         ordNub (filter isAllowedOption (concatMap (hcOptions GHC) buildInfo))
 
+#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
     -- We don't care about the stack ghc compiler because we don't need it for
     -- the stack checker
     getGhcVersion :: IO String
@@ -385,6 +405,7 @@ dumpPackageDescription pkgDesc projectDir = do
               Left (_ :: SomeException)      -> return mempty
               Right (ExitSuccess, stdOut, _) -> return $ stripWhitespace stdOut
               Right (ExitFailure _, _, _)    -> cont
+#endif
 
 getCabalConfiguration :: HPackExe -> ConfigurationFile -> IO Sexp
 getCabalConfiguration hpackExe configFile = do
