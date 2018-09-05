@@ -144,12 +144,16 @@ Take the base command from `flycheck-haskell-runghc-command'."
 
 (defun flycheck-haskell--read-configuration-with-helper (command)
   (with-temp-buffer
-    (pcase (apply 'call-process (car command) nil (list t nil) nil (cdr command))
-      (0 (goto-char (point-min))
-         (read (current-buffer)))
-      (retcode (message "Reading Haskell configuration failed with exit code %s and output:\n%s"
-                        retcode (buffer-string))
-               nil))))
+    ;; Hack around call-process' limitation handling standard error
+    (let ((error-file (make-temp-file "flycheck-haskell-errors")))
+      (pcase (apply 'call-process (car command) nil (list t error-file) nil (cdr command))
+        (0 (delete-file error-file)
+           (goto-char (point-min))
+           (read (current-buffer)))
+        (retcode (delete-file error-file)
+                 (message "Reading Haskell configuration failed with exit code %s and output:\n%s"
+                          retcode (buffer-string))
+                 nil)))))
 
 (defun flycheck-haskell-read-cabal-configuration (cabal-file)
   "Read the Cabal configuration from CABAL-FILE."
