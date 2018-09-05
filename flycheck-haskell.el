@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2016-2018 Sergey Vinokurov <serg.foo@gmail.com>
 ;; Copyright (C) 2014-2016 Sebastian Wiesner <swiesner@lunaryorn.com>
-;; Copyright (C) 2016 Danny Navarro
+;; Copyright (C) 2016-2018 Danny Navarro <j@dannynavarro.net>
 ;; Copyright (C) 2015 Mark Karpov <markkarpov@opmbx.org>
 ;; Copyright (C) 2015 Michael Alan Dorman <mdorman@ironicdesign.com>
 ;; Copyright (C) 2015 Alex Rozenshteyn <rpglover64@gmail.com>
@@ -115,7 +115,7 @@ value will make this library ignore `package.yaml' file, even if it's present."
   "How to handle projects with both `.cabal' and `package.yaml' files present.
 
 This option controls which configuration file this library will pick for
-a projcet that has both `.cabal' and `package.yaml' files present.
+a project that has both `.cabal' and `package.yaml' files present.
 The default, 'prefer-hpack, will make it pick `package.yaml' file as the source
 of configuration parameters.  Another possible value, 'prefer-cabal will
 make it pick `.cabal' file in such a case."
