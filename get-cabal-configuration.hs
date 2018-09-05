@@ -370,12 +370,21 @@ dumpPackageDescription pkgDesc projectDir = do
     ghcOpts =
         ordNub (filter isAllowedOption (concatMap (hcOptions GHC) buildInfo))
 
-    getGhcVersion = do
-      res <- try $ readProcessWithExitCode "cabal" ["new-exec", "ghc", "--", "--numeric-version"] []
-      return $ case res of
-          Left (_ :: SomeException)      -> mempty
-          Right (ExitSuccess, stdOut, _) -> stripWhitespace stdOut
-          Right (ExitFailure _, _, _)    -> mempty
+    -- We don't care about the stack ghc compiler because we don't need it for
+    -- the stack checker
+    getGhcVersion :: IO String
+    getGhcVersion =
+        go "cabal"
+           ["new-exec", "ghc", "--", "--numeric-version"]
+           (go "ghc" ["--numeric-version"] A.empty)
+      where
+        go :: String -> [String] -> IO String -> IO String
+        go comm opts cont = do
+          res <- try $ readProcessWithExitCode comm opts []
+          case res of
+              Left (_ :: SomeException)      -> return mempty
+              Right (ExitSuccess, stdOut, _) -> return $ stripWhitespace stdOut
+              Right (ExitFailure _, _, _)    -> cont
 
 getCabalConfiguration :: HPackExe -> ConfigurationFile -> IO Sexp
 getCabalConfiguration hpackExe configFile = do
