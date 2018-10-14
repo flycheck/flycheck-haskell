@@ -78,7 +78,14 @@
         (runghc-exe (funcall flycheck-executable-find "runghc")))
     (cond
       (stack-exe
-       `(,stack-exe "--verbosity" "silent" "runghc" "--no-ghc-package-path" "--" "-i" "-packageCabal"))
+       `(,stack-exe "--verbosity" "silent" "runghc" "--no-ghc-package-path" "--" "-i"
+                    "-packageCabal"
+                    "-packagebase"
+                    "-packagebytestring"
+                    "-packagecontainers"
+                    "-packageprocess"
+                    "-packagedirectory"
+                    "-packagefilepath"))
       (runghc-exe
        `(,runghc-exe "--" "-i"
                      "-packageCabal"

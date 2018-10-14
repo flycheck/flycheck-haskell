@@ -8,5 +8,6 @@
 /.cask/
 /dist/
 /build/
+dist-newstyle/
 
 /.stack-work/
