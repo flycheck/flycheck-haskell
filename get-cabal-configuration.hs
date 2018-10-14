@@ -402,7 +402,7 @@ dumpPackageDescription pkgDesc projectDir = do
         go comm opts cont = do
           res <- try $ readProcessWithExitCode comm opts []
           case res of
-              Left (_ :: SomeException)      -> return mempty
+              Left (_ :: SomeException)      -> cont
               Right (ExitSuccess, stdOut, _) -> return $ stripWhitespace stdOut
               Right (ExitFailure _, _, _)    -> cont
 #endif
