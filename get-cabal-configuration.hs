@@ -1,6 +1,6 @@
 -- Copyright (C) 2016-2018 Sergey Vinokurov <serg.foo@gmail.com>
 -- Copyright (C) 2014-2016 Sebastian Wiesner <swiesner@lunaryorn.com>
--- Copyright (C) 2016 Danny Navarro
+-- Copyright (C) 2016-2018 Danny Navarro <j@dannynavarro.net>
 -- Copyright (C) 2015 Mark Karpov <markkarpov@opmbx.org>
 -- Copyright (C) 2015 Michael Alan Dorman <mdorman@ironicdesign.com>
 -- Copyright (C) 2014 Gracjan Polak <gracjanpolak@gmail.com>
@@ -96,6 +96,9 @@ import Distribution.Simple.BuildPaths (defaultDistPref)
 import Distribution.Simple.Utils (cabalVersion)
 import Distribution.System (buildPlatform)
 import Distribution.Text (display)
+#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
+import Distribution.Types.PackageId (PackageId)
+#endif
 import Distribution.Verbosity (silent)
 import Language.Haskell.Extension (Extension(..),Language(..))
 import System.Console.GetOpt
@@ -125,7 +128,7 @@ import Distribution.Types.UnqualComponentName (unUnqualComponentName)
 import qualified Distribution.Version as CabalVersion
 import Distribution.Types.Benchmark (Benchmark(benchmarkName))
 import Distribution.Types.TestSuite (TestSuite(testName))
-import System.Directory (doesDirectoryExist)
+import System.Directory (doesDirectoryExist, doesFileExist)
 #else
 import Control.Arrow (second)
 import Data.Version (showVersion)
@@ -141,7 +144,6 @@ import Distribution.PackageDescription
 import Distribution.PackageDescription
        (TestSuite(..), condTestSuites, testEnabled)
 # endif
-
 #endif
 
 #if defined(Cabal22) || defined(Cabal24)
@@ -169,6 +171,12 @@ data Sexp
     | SSymbol String
 
 data TargetTool = Cabal | Stack
+#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
+                        | CabalNew PackageId GhcVersion
+
+type GhcVersion = String
+#endif
+
 
 sym :: String -> Sexp
 sym = SSymbol
@@ -224,6 +232,12 @@ distDir Stack = do
         ".stack-work" </> defaultDistPref
                       </> display buildPlatform
                       </> "Cabal-" ++ cabalVersion'
+#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
+distDir (CabalNew packageId ghcVersion) =
+    return $ "dist-newstyle/build" </> display buildPlatform
+                                   </> "ghc-" ++ ghcVersion
+                                   </> display packageId
+#endif
 
 getBuildDirectories
     :: TargetTool
@@ -246,12 +260,20 @@ getBuildDirectories tool pkgDesc cabalDir = do
 
     let componentBuildDir :: String -> FilePath
         componentBuildDir componentName =
-            buildDir </> componentName </> (componentName ++ "-tmp")
+#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
+          case tool of
+            CabalNew _ _ -> cabalDir </> distDir'
+                                     </> "build"
+                                     </> componentName
+                                     </> (componentName ++ "-tmp")
+            _ -> buildDir </> componentName </> (componentName ++ "-tmp")
+#else
+          buildDir </> componentName </> (componentName ++ "-tmp")
+#endif
 
         buildDirs :: [FilePath]
         buildDirs =
-            autogenDirs ++
-            map componentBuildDir componentNames
+            autogenDirs ++ map componentBuildDir componentNames
 
         buildDirs' = case library pkgDesc of
             Just _  -> buildDir : buildDirs
@@ -262,13 +284,22 @@ getAutogenDirs :: FilePath -> [String] -> IO [FilePath]
 getAutogenDirs buildDir componentNames =
     (autogenDir :) A.<$> componentsAutogenDirs buildDir componentNames
   where
-    -- 'dist/bulid/autogen' OR '.stack-work/dist/x86_64-linux/Cabal-1.24.2.0/build/autogen'
+    -- 'dist/bulid/autogen' OR
+    -- '.stack-work/dist/x86_64-linux/Cabal-1.24.2.0/build/autogen' OR
+    -- ./dist-newstyle/build/x86_64-linux/ghc-8.4.3/lens-4.17/build/autogen
     autogenDir :: FilePath
     autogenDir = buildDir </> "autogen"
 
 getSourceDirectories :: [BuildInfo] -> FilePath -> [String]
 getSourceDirectories buildInfo cabalDir =
     map (cabalDir </>) (concatMap hsSourceDirs buildInfo)
+
+#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
+doesPackageEnvExist :: GhcVersion -> FilePath -> IO Bool
+doesPackageEnvExist ghcVersion projectDir = doesFileExist $ projectDir </> packageEnvFn
+  where
+    packageEnvFn = ".ghc.environment." ++ display buildPlatform ++ "-" ++ ghcVersion
+#endif
 
 allowedOptions :: Set String
 allowedOptions = S.fromList
@@ -304,8 +335,16 @@ dumpPackageDescription :: PackageDescription -> FilePath -> IO Sexp
 dumpPackageDescription pkgDesc projectDir = do
     (cabalDirs, cabalAutogen) <- getBuildDirectories Cabal pkgDesc projectDir
     (stackDirs, stackAutogen) <- getBuildDirectories Stack pkgDesc projectDir
+#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
+    ghcVersion <- getGhcVersion
+    (cabalNewDirs, cabalNewAutogen) <- getBuildDirectories (CabalNew (package pkgDesc) ghcVersion) pkgDesc projectDir
+    packageEnvExists <- doesPackageEnvExist ghcVersion projectDir
+    let buildDirs   = cabalDirs ++ stackDirs ++ cabalNewDirs
+        autogenDirs = cabalAutogen ++ stackAutogen ++ cabalNewAutogen
+#else
     let buildDirs   = cabalDirs ++ stackDirs
         autogenDirs = cabalAutogen ++ stackAutogen
+#endif
     return $
         SList
             [ cons (sym "build-directories") (ordNub (map normalise buildDirs))
@@ -316,29 +355,57 @@ dumpPackageDescription pkgDesc projectDir = do
             , cons (sym "other-options") (cppOpts ++ ghcOpts)
             , cons (sym "autogen-directories") (map normalise autogenDirs)
             , cons (sym "should-include-version-header") [not ghcIncludesVersionMacro]
+#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
+            , cons (sym "package-env-exists") [packageEnvExists]
+#endif
             ]
   where
     buildInfo :: [BuildInfo]
     buildInfo = allBuildInfo pkgDesc
+
     sourceDirs :: [FilePath]
     sourceDirs = ordNub (map normalise (getSourceDirectories buildInfo projectDir))
+
     exts :: [Extension]
     exts = nub (concatMap usedExtensions buildInfo)
+
     langs :: [Language]
     langs = nub (concatMap allLanguages buildInfo)
+
     thisPackage :: PackageName
     thisPackage = pkgName (package pkgDesc)
+
     deps :: [Dependency]
     deps =
         nub (filter (\(Dependency name _) -> name /= thisPackage) (buildDepends' pkgDesc))
+
     -- The "cpp-options" configuration field.
     cppOpts :: [String]
     cppOpts =
         ordNub (filter isAllowedOption (concatMap cppOptions buildInfo))
+
     -- The "ghc-options" configuration field.
     ghcOpts :: [String]
     ghcOpts =
         ordNub (filter isAllowedOption (concatMap (hcOptions GHC) buildInfo))
+
+#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
+    -- We don't care about the stack ghc compiler because we don't need it for
+    -- the stack checker
+    getGhcVersion :: IO String
+    getGhcVersion =
+        go "cabal"
+           ["new-exec", "ghc", "--", "--numeric-version"]
+           (go "ghc" ["--numeric-version"] A.empty)
+      where
+        go :: String -> [String] -> IO String -> IO String
+        go comm opts cont = do
+          res <- try $ readProcessWithExitCode comm opts []
+          case res of
+              Left (_ :: SomeException)      -> cont
+              Right (ExitSuccess, stdOut, _) -> return $ stripWhitespace stdOut
+              Right (ExitFailure _, _, _)    -> cont
+#endif
 
 getCabalConfiguration :: HPackExe -> ConfigurationFile -> IO Sexp
 getCabalConfiguration hpackExe configFile = do

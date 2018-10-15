@@ -234,6 +234,24 @@ using directory separator."
         (should (equal .source-directories (list (expand-file-name "lib/" test-dir))))))))
 
 
+;;; Package environment support
+(ert-deftest flycheck-haskell-read-cabal-configuration/read-from-dir-that-has-package-env ()
+  (let* ((test-dir (flycheck-haskell--concat-dirs flycheck-haskell-test-dir
+                                                  "test-data"
+                                                  "project-with-package-env"))
+         (default-directory test-dir))
+    (cl-assert (file-regular-p (expand-file-name "foo.cabal" test-dir)))
+    (flycheck-haskell-read-cabal-configuration "foo.cabal")
+    (let ((conf (flycheck-haskell-read-cabal-configuration "foo.cabal")))
+      (let-alist conf
+        (should (equal .dependencies '("base")))
+        (should (equal .extensions '("OverloadedStrings")))
+        (should (equal .languages '("Haskell2010")))
+        (should (member "-Wall" .other-options))
+        (should (member "-fwarn-haha-no-such-option" .other-options))
+        (should (equal .source-directories (list (expand-file-name "lib/" test-dir))))))))
+
+
 ;;; Configuration caching
 (ert-deftest flycheck-haskell-clear-config-cache ()
   (unwind-protect

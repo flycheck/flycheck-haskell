@@ -10,3 +10,7 @@
 /build/
 
 /.stack-work/
+
+test/test-data/project-with-cabal-file/dist-newstyle/
+test/test-data/project-with-package-env/dist-newstyle/cache/
+test/test-data/project-with-prelude-module/dist-newstyle/
