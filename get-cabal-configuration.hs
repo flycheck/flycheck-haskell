@@ -95,6 +95,9 @@ import Distribution.PackageDescription
 import Distribution.Simple.BuildPaths (defaultDistPref)
 import Distribution.Simple.Utils (cabalVersion)
 import Distribution.System (buildPlatform)
+#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
+import Distribution.System (OS(OSX), buildArch, buildOS)
+#endif
 import Distribution.Text (display)
 #if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
 import Distribution.Types.PackageId (PackageId)
@@ -298,7 +301,13 @@ getSourceDirectories buildInfo cabalDir =
 doesPackageEnvExist :: GhcVersion -> FilePath -> IO Bool
 doesPackageEnvExist ghcVersion projectDir = doesFileExist $ projectDir </> packageEnvFn
   where
-    packageEnvFn = ".ghc.environment." ++ display buildPlatform ++ "-" ++ ghcVersion
+    packageEnvFn =
+      -- The filename for package environments in MacOS uses the synonym "darwin
+      -- "instead of the "official" buildPlatform, "osx".
+      case buildOS of
+        OSX -> ".ghc.environment." ++ display buildArch ++ "-" ++ "darwin" ++ "-" ++ ghcVersion
+        _   -> ".ghc.environment." ++ display buildPlatform ++ "-" ++ ghcVersion
+
 #endif
 
 allowedOptions :: Set String
