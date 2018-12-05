@@ -157,7 +157,8 @@ Take the base command from `flycheck-haskell-runghc-command'."
         (0 (delete-file error-file)
            (goto-char (point-min))
            (read (current-buffer)))
-        (retcode (delete-file error-file)
+        (retcode (insert-file-contents error-file)
+                 (delete-file error-file)
                  (message "Reading Haskell configuration failed with exit code %s and output:\n%s"
                           retcode (buffer-string))
                  nil)))))
