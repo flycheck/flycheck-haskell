@@ -336,9 +336,15 @@ allowedOptionPrefixes =
     , "-opt"
     ]
 
+forbiddenOptions :: Set String
+forbiddenOptions = S.fromList
+   [ "-Wmissing-home-modules"
+   , "-Werror=missing-home-modules"
+   ]
+
 isAllowedOption :: String -> Bool
 isAllowedOption opt =
-    S.member opt allowedOptions || any (`isPrefixOf` opt) allowedOptionPrefixes
+    S.member opt allowedOptions || any (`isPrefixOf` opt) allowedOptionPrefixes && S.notMember opt forbiddenOptions
 
 dumpPackageDescription :: PackageDescription -> FilePath -> IO Sexp
 dumpPackageDescription pkgDesc projectDir = do
