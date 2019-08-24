@@ -694,7 +694,7 @@ ordNub = go S.empty
   where
     go :: Set a -> [a] -> [a]
     go _   []     = []
-    go acc (x:xs)
+    go !acc (x:xs)
         | S.member x acc = go acc xs
         | otherwise      = x : go (S.insert x acc) xs
 
