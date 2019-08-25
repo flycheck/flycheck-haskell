@@ -335,7 +335,51 @@ buffer."
                 (flycheck-haskell--delete-dups
                  (append (seq-map (apply-partially #'concat "--cpp-include=")
                                   .autogen-directories)
-                         '("--cpp-file=cabal_macros.h"))))))
+                         '("--cpp-file=cabal_macros.h"))))
+    (setq-local flycheck-haskell-components .components)
+    (when-let ((component (flycheck-haskell-cabal-component-for-current-buffer)))
+      (setq-local dante-target
+                  (concat (car .package-name) ":" component)))))
+
+(defun flycheck-haskell-cabal-component-for-current-buffer ()
+  (flycheck-haskell-find-cabal-component-for-file flycheck-haskell-components
+                                                  (buffer-file-name)))
+
+(defun flycheck-haskell-find-cabal-component-for-file (components filename)
+  (when filename
+    (let ((entry
+           (-find (lambda (component-descr)
+                    (let ((main-file (cl-third component-descr))
+                          (modules (cl-fourth component-descr)))
+                      (when (or main-file modules)
+                        (let* ((mod-regexps
+                                (when modules
+                                  (mapconcat (lambda (x)
+                                               (concat "\\(?:"
+                                                       (mapconcat #'identity x ".")
+                                                       "\\)"))
+                                             modules
+                                             "\\|")))
+                               (re
+                                (concat (when main-file
+                                          (concat "\\(?:" main-file "\\)"))
+                                        (when (and main-file mod-regexps)
+                                          "\\|")
+                                        (when mod-regexps
+                                          (concat
+                                           "\\(?:"
+                                           mod-regexps
+                                           "\\)"
+                                           "[.]"
+                                           (regexp-opt +haskell-extensions+)))
+                                        "\\'")))
+                          (and re
+                               (string-match-p re filename))))))
+                  components)))
+      (when entry
+        (let ((typ (cl-first entry))
+              (name (cl-second entry)))
+          (concat typ ":" name))))))
 
 (defun flycheck-haskell-configure ()
   "Set paths and package database for the current project."
