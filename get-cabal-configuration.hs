@@ -1,4 +1,4 @@
--- Copyright (C) 2016-2018 Sergey Vinokurov <serg.foo@gmail.com>
+-- Copyright (C) 2016-2019 Sergey Vinokurov <serg.foo@gmail.com>
 -- Copyright (C) 2014-2016 Sebastian Wiesner <swiesner@lunaryorn.com>
 -- Copyright (C) 2016-2018 Danny Navarro <j@dannynavarro.net>
 -- Copyright (C) 2015 Mark Karpov <markkarpov@opmbx.org>
@@ -20,11 +20,12 @@
 -- You should have received a copy of the GNU General Public License along with
 -- this program.  If not, see <http://www.gnu.org/licenses/>.
 
+{-# LANGUAGE BangPatterns         #-}
 {-# LANGUAGE CPP                  #-}
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE NamedFieldPuns       #-}
+{-# LANGUAGE OverloadedStrings    #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 
 module Main (main) where
 
@@ -33,12 +34,21 @@ module Main (main) where
 #endif
 
 #if defined(GHC_INCLUDES_VERSION_MACRO)
-# if MIN_VERSION_Cabal(2, 3, 0)
+# if MIN_VERSION_Cabal(3, 0, 0)
+#  define Cabal30 1
+#  define Cabal22OrLater 1
+#  define Cabal20OrLater 1
+# elif MIN_VERSION_Cabal(2, 3, 0)
 #  define Cabal24 1
-# elif MIN_VERSION_Cabal(2, 2, 0)
+#  define Cabal22OrLater 1
+#  define Cabal20OrLater 1
+# elif MIN_VERSION_Cabal(2, 1, 0)
 #  define Cabal22 1
+#  define Cabal22OrLater 1
+#  define Cabal20OrLater 1
 # elif MIN_VERSION_Cabal(2, 0, 0)
 #  define Cabal20 1
+#  define Cabal20OrLater 1
 # endif
 #else
 -- Hack - we may actually be using Cabal 2.0 with e.g. 7.8 GHC. But
@@ -64,17 +74,43 @@ module Main (main) where
 #define HAVE_DATA_FUNCTOR_IDENTITY
 #endif
 
+import qualified Data.ByteString.Char8 as C8
+#if __GLASGOW_HASKELL__ > 704
+import qualified Data.ByteString.Lazy.Builder as CL8.Builder
+#else
+import qualified Data.ByteString.Lazy.Char8 as CL8
+#endif
+
+import Distribution.ModuleName (ModuleName)
+import qualified Distribution.ModuleName as ModuleName
+import Distribution.PackageDescription ()
+
+#if defined(Cabal20OrLater)
+import Distribution.Types.Benchmark (benchmarkBuildInfo, benchmarkInterface)
+import Distribution.Types.ForeignLib (foreignLibBuildInfo)
+import Distribution.Types.TestSuite (testBuildInfo, testInterface)
+
+import Distribution.PackageDescription (allLibraries, libName)
+#else
+import Distribution.PackageDescription (library)
+#endif
+
+
 import qualified Control.Applicative as A
 import Control.Exception (SomeException, try)
 import Control.Monad (when)
-#if defined(Cabal22) || defined(Cabal24)
+#if defined(Cabal22OrLater)
 import qualified Data.ByteString as BS
 #endif
 import Data.Char (isSpace)
 #if defined(HAVE_DATA_FUNCTOR_IDENTITY)
 import Data.Functor.Identity
 #endif
-import Data.List (isPrefixOf, nub, foldl')
+import Data.List (nub, foldl', intersperse)
+import Data.Maybe (maybeToList)
+#if __GLASGOW_HASKELL__ < 710
+import Data.Monoid
+#endif
 import Data.Set (Set)
 import qualified Data.Set as S
 #ifdef Cabal118OrLess
@@ -88,18 +124,18 @@ import Distribution.Compiler
 import Distribution.Package
        (pkgName, Dependency(..))
 import Distribution.PackageDescription
-       (GenericPackageDescription,
-        PackageDescription(..), allBuildInfo, BuildInfo(..),
-        usedExtensions, allLanguages, hcOptions, exeName,
-        Executable)
+       (GenericPackageDescription, PackageDescription(..),
+        TestSuiteInterface(..), BuildInfo(..), Library, Executable,
+        allBuildInfo, usedExtensions, allLanguages, hcOptions, exeName,
+        buildInfo, modulePath, libBuildInfo, exposedModules)
 import Distribution.Simple.BuildPaths (defaultDistPref)
 import Distribution.Simple.Utils (cabalVersion)
 import Distribution.System (buildPlatform)
-#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
+#if defined(Cabal20OrLater)
 import Distribution.System (OS(OSX), buildArch, buildOS)
 #endif
 import Distribution.Text (display)
-#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
+#if defined(Cabal20OrLater)
 import Distribution.Types.PackageId (PackageId)
 #endif
 import Distribution.Verbosity (silent)
@@ -109,19 +145,23 @@ import System.Environment (getArgs)
 import System.Exit (ExitCode(..), exitFailure, exitSuccess)
 import System.FilePath ((</>),dropFileName,normalise)
 import System.Info (compilerVersion)
-import System.IO (Handle, hGetContents, hPutStrLn, stderr)
+import System.IO (Handle, hGetContents, hPutStrLn, stderr, stdout)
 import System.Process (readProcessWithExitCode)
 import qualified System.Process as Process
 
-#if __GLASGOW_HASKELL__ >= 710 && !defined(Cabal20) && !defined(Cabal22) && !defined(Cabal24)
+#if __GLASGOW_HASKELL__ >= 710 && !defined(Cabal20) && !defined(Cabal22OrLater)
 import Data.Version (Version)
 #endif
 
-#if defined(Cabal24)
+#if defined(Cabal24) || defined(Cabal30)
 import Distribution.PackageDescription (allBuildDepends)
 #endif
 
-#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
+#if defined(Cabal114OrMore)
+import Distribution.PackageDescription (BenchmarkInterface(..),)
+#endif
+
+#if defined(Cabal20OrLater)
 import Control.Monad (filterM)
 import Distribution.Package (unPackageName, depPkgName, PackageName)
 import Distribution.PackageDescription.Configuration (finalizePD)
@@ -139,25 +179,29 @@ import Distribution.Package (PackageName(..))
 import Distribution.PackageDescription.Configuration
        (finalizePackageDescription, mapTreeData)
 
-# if Cabal114OrMore
+# if defined(Cabal114OrMore)
 import Distribution.PackageDescription
-       (TestSuite(..), Benchmark(..), condTestSuites, condBenchmarks,
-        benchmarkEnabled, testEnabled)
+       (TestSuite(..), Benchmark(..),
+        condTestSuites, condBenchmarks, benchmarkEnabled, testEnabled)
 # else
 import Distribution.PackageDescription
        (TestSuite(..), condTestSuites, testEnabled)
 # endif
 #endif
 
-#if defined(Cabal22) || defined(Cabal24)
+#if defined(Cabal22OrLater)
 import Distribution.Pretty (prettyShow)
 import Distribution.Types.GenericPackageDescription (mkFlagAssignment)
 #endif
 
-#if defined(Cabal22) || defined(Cabal24)
+#if defined(Cabal22OrLater)
 import Distribution.PackageDescription.Parsec
        (runParseResult, readGenericPackageDescription, parseGenericPackageDescription)
+# if defined(Cabal30)
+import Distribution.Parsec.Error (showPError)
+#else
 import Distribution.Parsec.Common (showPError)
+# endif
 #elif defined(Cabal20)
 import Distribution.PackageDescription.Parse
        (ParseResult(..), readGenericPackageDescription, parseGenericPackageDescription)
@@ -168,54 +212,98 @@ import Distribution.PackageDescription.Parse
 import Distribution.ParseUtils (locatedErrorMsg)
 #endif
 
+#if defined(Cabal30)
+import Distribution.Types.LibraryName (libraryNameString)
+#endif
+
 data Sexp
     = SList [Sexp]
-    | SString String
-    | SSymbol String
+    | SString C8.ByteString
+    | SSymbol C8.ByteString
 
 data TargetTool = Cabal | Stack
-#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
+#if defined(Cabal20OrLater)
                         | CabalNew PackageId GhcVersion
 
 type GhcVersion = String
 #endif
 
+#if __GLASGOW_HASKELL__ > 704
+type Builder = CL8.Builder.Builder
 
-sym :: String -> Sexp
+builderFromByteString :: C8.ByteString -> Builder
+builderFromByteString = CL8.Builder.byteString
+
+builderFromChar :: Char -> Builder
+builderFromChar = CL8.Builder.char8
+
+hPutBuilder :: Handle -> Builder -> IO ()
+hPutBuilder = CL8.Builder.hPutBuilder
+
+#else
+type Builder = Endo CL8.ByteString
+
+builderFromByteString :: C8.ByteString -> Builder
+builderFromByteString x = Endo (CL8.fromChunks [x] `mappend`)
+
+builderFromChar :: Char -> Builder
+builderFromChar c = Endo (CL8.singleton c `mappend`)
+
+hPutBuilder :: Handle -> Builder -> IO ()
+hPutBuilder h (Endo f) = CL8.hPut h $ f CL8.empty
+#endif
+
+sym :: C8.ByteString -> Sexp
 sym = SSymbol
 
-instance Show Sexp where
-    show (SSymbol s) = s
-    show (SString s) = show s     -- Poor man's escaping
-    show (SList s) = "(" ++ unwords (map show s) ++ ")"
+renderSexp :: Sexp -> Builder
+renderSexp (SSymbol s) = builderFromByteString s
+renderSexp (SString s) = dquote `mappend` builderFromByteString s `mappend` dquote
+  where
+    dquote = builderFromChar '"'
+renderSexp (SList xs)  =
+    lparen `mappend` mconcat (intersperse space (map renderSexp xs)) `mappend` rparen
+  where
+    lparen = builderFromChar '('
+    rparen = builderFromChar ')'
+    space  = builderFromChar ' '
 
 class ToSexp a  where
     toSexp :: a -> Sexp
 
-instance ToSexp String where
+instance ToSexp C8.ByteString where
     toSexp = SString
 
 instance ToSexp Extension where
-    toSexp (EnableExtension ext) = toSexp (show ext)
-    toSexp (DisableExtension ext) = toSexp ("No" ++ show ext)
-    toSexp (UnknownExtension ext) = toSexp ext
+    toSexp (EnableExtension ext) = toSexp (C8.pack (show ext))
+    toSexp (DisableExtension ext) = toSexp ("No" `mappend` C8.pack (show ext))
+    toSexp (UnknownExtension ext) = toSexp (C8.pack ext)
 
 instance ToSexp Language where
-    toSexp (UnknownLanguage lang) = toSexp lang
-    toSexp lang = toSexp (show lang)
+    toSexp (UnknownLanguage lang) = toSexp (C8.pack lang)
+    toSexp lang = toSexp (C8.pack (show lang))
 
 instance ToSexp Dependency where
-#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
-    toSexp = toSexp . unPackageName . depPkgName
-#else
-    toSexp (Dependency (PackageName dependency) _) = toSexp dependency
-#endif
+    toSexp = toSexp . C8.pack . unPackageName' . depPkgName'
 
 instance ToSexp Sexp where
     toSexp = id
 
 instance ToSexp Bool where
     toSexp b = SSymbol $ if b then "t" else "nil"
+
+instance ToSexp a => ToSexp [a] where
+    toSexp = SList . map toSexp
+
+instance ToSexp a => ToSexp (Maybe a) where
+    toSexp Nothing  = SSymbol "nil"
+    toSexp (Just x) = toSexp x
+
+instance ToSexp ModuleName where
+    toSexp = toSexp . map C8.pack . ModuleName.components
+
+instance (ToSexp a, ToSexp b, ToSexp c, ToSexp d) => ToSexp (a, b, c, d) where
+    toSexp (a, b, c, d) = SList [toSexp a, toSexp b, toSexp c, toSexp d]
 
 cons :: (ToSexp a, ToSexp b) => a -> [b] -> Sexp
 cons h t = SList (toSexp h : map toSexp t)
@@ -235,7 +323,7 @@ distDir Stack = do
         ".stack-work" </> defaultDistPref
                       </> display buildPlatform
                       </> "Cabal-" ++ cabalVersion'
-#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
+#if defined(Cabal20OrLater)
 distDir (CabalNew packageId ghcVersion) =
     return $ "dist-newstyle/build" </> display buildPlatform
                                    </> "ghc-" ++ ghcVersion
@@ -263,7 +351,7 @@ getBuildDirectories tool pkgDesc cabalDir = do
 
     let componentBuildDir :: String -> FilePath
         componentBuildDir componentName =
-#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
+#if defined(Cabal20OrLater)
           case tool of
             CabalNew _ _ -> cabalDir </> distDir'
                                      </> "build"
@@ -297,7 +385,7 @@ getSourceDirectories :: [BuildInfo] -> FilePath -> [String]
 getSourceDirectories buildInfo cabalDir =
     map (cabalDir </>) (concatMap hsSourceDirs buildInfo)
 
-#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
+#if defined(Cabal20OrLater)
 doesPackageEnvExist :: GhcVersion -> FilePath -> IO Bool
 doesPackageEnvExist ghcVersion projectDir = doesFileExist $ projectDir </> packageEnvFn
   where
@@ -310,7 +398,7 @@ doesPackageEnvExist ghcVersion projectDir = doesFileExist $ projectDir </> packa
 
 #endif
 
-allowedOptions :: Set String
+allowedOptions :: Set C8.ByteString
 allowedOptions = S.fromList
     [ "-w"
     , "-fglasgow-exts"
@@ -320,7 +408,7 @@ allowedOptions = S.fromList
     , "-cpp"
     ]
 
-allowedOptionPrefixes :: [String]
+allowedOptionPrefixes :: [C8.ByteString]
 allowedOptionPrefixes =
     [ "-fwarn-"
     , "-fno-warn-"
@@ -336,21 +424,21 @@ allowedOptionPrefixes =
     , "-opt"
     ]
 
-forbiddenOptions :: Set String
+forbiddenOptions :: Set C8.ByteString
 forbiddenOptions = S.fromList
    [ "-Wmissing-home-modules"
    , "-Werror=missing-home-modules"
    ]
 
-isAllowedOption :: String -> Bool
+isAllowedOption :: C8.ByteString -> Bool
 isAllowedOption opt =
-    S.member opt allowedOptions || any (`isPrefixOf` opt) allowedOptionPrefixes && S.notMember opt forbiddenOptions
+    S.member opt allowedOptions || any (`C8.isPrefixOf` opt) allowedOptionPrefixes && S.notMember opt forbiddenOptions
 
 dumpPackageDescription :: PackageDescription -> FilePath -> IO Sexp
 dumpPackageDescription pkgDesc projectDir = do
     (cabalDirs, cabalAutogen) <- getBuildDirectories Cabal pkgDesc projectDir
     (stackDirs, stackAutogen) <- getBuildDirectories Stack pkgDesc projectDir
-#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
+#if defined(Cabal20OrLater)
     ghcVersion <- getGhcVersion
     (cabalNewDirs, cabalNewAutogen) <- getBuildDirectories (CabalNew (package pkgDesc) ghcVersion) pkgDesc projectDir
     packageEnvExists <- doesPackageEnvExist ghcVersion projectDir
@@ -360,26 +448,29 @@ dumpPackageDescription pkgDesc projectDir = do
     let buildDirs   = cabalDirs ++ stackDirs
         autogenDirs = cabalAutogen ++ stackAutogen
 #endif
+    let packageName = C8.pack $ unPackageName' $ pkgName $ package pkgDesc
     return $
         SList
-            [ cons (sym "build-directories") (ordNub (map normalise buildDirs))
+            [ cons (sym "build-directories") (ordNub (map (C8.pack . normalise) buildDirs))
             , cons (sym "source-directories") sourceDirs
             , cons (sym "extensions") exts
             , cons (sym "languages") langs
             , cons (sym "dependencies") deps
             , cons (sym "other-options") (cppOpts ++ ghcOpts)
-            , cons (sym "autogen-directories") (map normalise autogenDirs)
+            , cons (sym "autogen-directories") (map (C8.pack . normalise) autogenDirs)
             , cons (sym "should-include-version-header") [not ghcIncludesVersionMacro]
-#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
+#if defined(Cabal20OrLater)
             , cons (sym "package-env-exists") [packageEnvExists]
 #endif
+            , cons (sym "package-name") [packageName]
+            , cons (sym "components") $ getComponents packageName pkgDesc
             ]
   where
     buildInfo :: [BuildInfo]
     buildInfo = allBuildInfo pkgDesc
 
-    sourceDirs :: [FilePath]
-    sourceDirs = ordNub (map normalise (getSourceDirectories buildInfo projectDir))
+    sourceDirs :: [C8.ByteString]
+    sourceDirs = ordNub (map (C8.pack . normalise) (getSourceDirectories buildInfo projectDir))
 
     exts :: [Extension]
     exts = nub (concatMap usedExtensions buildInfo)
@@ -392,19 +483,19 @@ dumpPackageDescription pkgDesc projectDir = do
 
     deps :: [Dependency]
     deps =
-        nub (filter (\(Dependency name _) -> name /= thisPackage) (buildDepends' pkgDesc))
+        nub (filter ((/= thisPackage) . depPkgName') (buildDepends' pkgDesc))
 
     -- The "cpp-options" configuration field.
-    cppOpts :: [String]
+    cppOpts :: [C8.ByteString]
     cppOpts =
-        ordNub (filter isAllowedOption (concatMap cppOptions buildInfo))
+        ordNub (filter isAllowedOption (map C8.pack (concatMap cppOptions buildInfo)))
 
     -- The "ghc-options" configuration field.
-    ghcOpts :: [String]
+    ghcOpts :: [C8.ByteString]
     ghcOpts =
-        ordNub (filter isAllowedOption (concatMap (hcOptions GHC) buildInfo))
+        ordNub (filter isAllowedOption (map C8.pack (concatMap (hcOptions GHC) buildInfo)))
 
-#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
+#if defined(Cabal20OrLater)
     -- We don't care about the stack ghc compiler because we don't need it for
     -- the stack checker
     getGhcVersion :: IO String
@@ -420,6 +511,73 @@ dumpPackageDescription pkgDesc projectDir = do
               Left (_ :: SomeException)      -> cont
               Right (ExitSuccess, stdOut, _) -> return $ stripWhitespace stdOut
               Right (ExitFailure _, _, _)    -> cont
+#endif
+
+data ComponentType
+    = CTLibrary
+    | CTForeignLibrary
+    | CTExecutable
+    | CTTestSuite
+    | CTBenchmark
+    deriving (Eq, Ord, Show, Enum, Bounded)
+
+componentTypePrefix :: ComponentType -> C8.ByteString
+componentTypePrefix x = case x of
+    CTLibrary        -> "lib"
+    CTForeignLibrary -> "flib"
+    CTExecutable     -> "exe"
+    CTTestSuite      -> "test"
+    CTBenchmark      -> "bench"
+
+instance ToSexp ComponentType where
+    toSexp = toSexp . componentTypePrefix
+
+-- | Gather files and modules that constitute each component.
+getComponents :: C8.ByteString -> PackageDescription -> [(ComponentType, C8.ByteString, Maybe C8.ByteString, [ModuleName])]
+getComponents packageName pkgDescr =
+    [ (CTLibrary, name, Nothing, exposedModules lib ++ biMods bi)
+    | lib <- allLibraries' pkgDescr
+    , let bi = libBuildInfo lib
+    , let name = maybe packageName C8.pack $ libName' lib
+    ] ++
+#if defined(Cabal20OrLater)
+    [ (CTForeignLibrary, C8.pack (foreignLibName' flib), Nothing, biMods bi)
+    | flib <- foreignLibs pkgDescr
+    , let bi = foreignLibBuildInfo flib
+    ] ++
+#endif
+    [ (CTExecutable, C8.pack (exeName' exe), Just (C8.pack (modulePath exe)), biMods bi)
+    | exe <- executables pkgDescr
+    , let bi = buildInfo exe
+    ] ++
+    [ (CTTestSuite, C8.pack (testName' tst), exeFile, maybeToList extraMod ++ biMods bi)
+    | tst <- testSuites pkgDescr
+    , let bi = testBuildInfo tst
+    , let (exeFile, extraMod) = case testInterface tst of
+            TestSuiteExeV10 _ path    -> (Just (C8.pack path), Nothing)
+            TestSuiteLibV09 _ modName -> (Nothing, Just modName)
+            TestSuiteUnsupported{}    -> (Nothing, Nothing)
+    ]
+#ifdef Cabal114OrMore
+    ++
+    [ (CTBenchmark, C8.pack (benchmarkName' tst), exeFile, biMods bi)
+    | tst <- benchmarks pkgDescr
+    , let bi = benchmarkBuildInfo tst
+    , let exeFile = case benchmarkInterface tst of
+            BenchmarkExeV10 _ path -> Just (C8.pack path)
+            BenchmarkUnsupported{} -> Nothing
+    ]
+#endif
+  where
+#if defined(Cabal20OrLater)
+      biMods bi =
+          otherModules bi
+#if defined(Cabal22OrLater)
+          ++ virtualModules bi
+#endif
+          ++ autogenModules bi
+#else
+      biMods = otherModules
 #endif
 
 getCabalConfiguration :: HPackExe -> ConfigurationFile -> IO Sexp
@@ -460,7 +618,7 @@ readHPackPkgDescr exe configFile projectDir = do
 
 buildDepends' :: PackageDescription -> [Dependency]
 buildDepends' =
-#if defined(Cabal24)
+#if defined(Cabal24) || defined(Cabal30)
     allBuildDepends
 #else
     buildDepends
@@ -468,7 +626,7 @@ buildDepends' =
 
 readGenericPkgDescr :: FilePath -> IO GenericPackageDescription
 readGenericPkgDescr =
-#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
+#if defined(Cabal20OrLater)
     readGenericPackageDescription silent
 #else
     readPackageDescription silent
@@ -476,7 +634,7 @@ readGenericPkgDescr =
 
 newtype CabalFileContents = CabalFileContents
     { unCabalFileContents ::
-#if defined(Cabal22) || defined(Cabal24)
+#if defined(Cabal22OrLater)
         BS.ByteString
 #else
         String
@@ -486,7 +644,7 @@ newtype CabalFileContents = CabalFileContents
 readCabalFileContentsFromHandle :: Handle -> IO CabalFileContents
 readCabalFileContentsFromHandle =
     fmap CabalFileContents .
-#if defined(Cabal22) || defined(Cabal24)
+#if defined(Cabal22OrLater)
         BS.hGetContents
 #else
         hGetContents
@@ -494,7 +652,7 @@ readCabalFileContentsFromHandle =
 
 parsePkgDescr :: FilePath -> CabalFileContents -> Either [String] GenericPackageDescription
 parsePkgDescr _fileName cabalFileContents =
-#if defined(Cabal22) || defined(Cabal24)
+#if defined(Cabal22OrLater)
     case runParseResult $ parseGenericPackageDescription $ unCabalFileContents cabalFileContents of
         (_warnings, res) ->
             case res of
@@ -518,7 +676,7 @@ getConcretePackageDescription
     :: GenericPackageDescription
     -> Either [Dependency] PackageDescription
 getConcretePackageDescription genericDesc = do
-#if defined(Cabal22) || defined(Cabal24)
+#if defined(Cabal22OrLater)
     let enabled :: ComponentRequestedSpec
         enabled = ComponentRequestedSpec
             { testsRequested      = True
@@ -590,7 +748,7 @@ getConcretePackageDescription genericDesc = do
 #endif
 
 componentsAutogenDirs :: FilePath -> [String] -> IO [FilePath]
-#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
+#if defined(Cabal20OrLater)
 componentsAutogenDirs buildDir componentNames =
         filterM doesDirectoryExist $
             map (\path -> buildDir </> path </> "autogen") componentNames
@@ -607,7 +765,7 @@ buildCompilerId = unknownCompilerInfo compId NoAbiTag
   where
     compId :: CompilerId
     compId = CompilerId buildCompilerFlavor compVersion
-# if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
+# if defined(Cabal20OrLater)
     compVersion :: CabalVersion.Version
     compVersion = CabalVersion.mkVersion' compilerVersion
 # else
@@ -616,64 +774,102 @@ buildCompilerId = unknownCompilerInfo compId NoAbiTag
 # endif
 #endif
 
+allLibraries' :: PackageDescription -> [Library]
+allLibraries' =
+#if defined(Cabal20OrLater)
+    allLibraries
+#else
+    maybeToList . library
+#endif
+
+libName' :: Library -> Maybe String
+libName' =
+#if defined(Cabal30)
+    fmap unUnqualComponentName . libraryNameString . libName
+#elif defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
+    fmap unUnqualComponentName . libName
+#else
+    const Nothing
+#endif
+
+exeName' :: Executable -> String
+exeName' =
+#if defined(Cabal20OrLater)
+    unUnqualComponentName . exeName
+#else
+    exeName
+#endif
+
+#if defined(Cabal20OrLater)
+foreignLibName' :: ForeignLib -> String
+foreignLibName' =
+    unUnqualComponentName . foreignLibName
+#endif
+
+testName' :: TestSuite -> String
+testName' =
+#if defined(Cabal20OrLater)
+    unUnqualComponentName . testName
+#else
+    testName
+#endif
+
+#ifdef Cabal114OrMore
+benchmarkName' :: Benchmark -> FilePath
+benchmarkName' =
+# if defined(Cabal20OrLater)
+    unUnqualComponentName . benchmarkName
+# else
+    benchmarkName
+# endif
+#endif
+
+
 getExeNames :: PackageDescription -> [String]
 getExeNames =
-    map getExeName . executables
-  where
-    getExeName :: Executable -> FilePath
-    getExeName =
-#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
-        unUnqualComponentName . exeName
-#else
-        exeName
-#endif
+    map exeName' . executables
 
 getForeignLibNames :: PackageDescription -> [String]
 getForeignLibNames =
-#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
-    map getForeignLibName . foreignLibs
-  where
-    getForeignLibName :: ForeignLib -> FilePath
-    getForeignLibName =
-        unUnqualComponentName . foreignLibName
+#if defined(Cabal20OrLater)
+    map foreignLibName' . foreignLibs
 #else
     const []
 #endif
 
-
 getTestNames :: PackageDescription -> [String]
 getTestNames =
-    map getTestName . testSuites
-  where
-    getTestName :: TestSuite -> FilePath
-    getTestName =
-#if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
-        unUnqualComponentName . testName
-#else
-        testName
-#endif
+    map testName' . testSuites
 
 getBenchmarkNames :: PackageDescription -> [String]
 getBenchmarkNames =
 #ifdef Cabal114OrMore
-    map getBenchName . benchmarks
-  where
-    getBenchName :: Benchmark -> FilePath
-    getBenchName =
-# if defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
-        unUnqualComponentName . benchmarkName
-# else
-        benchmarkName
-# endif
+    map benchmarkName' . benchmarks
 #else
     const []
+#endif
+
+depPkgName' :: Dependency -> PackageName
+depPkgName' =
+#if defined(Cabal20OrLater)
+    depPkgName
+#else
+    let f (Dependency x _) = x in f
+#endif
+
+unPackageName' :: PackageName -> String
+unPackageName' =
+#if defined(Cabal20OrLater)
+    unPackageName
+#else
+    let f (PackageName x) = x in f
 #endif
 
 
 -- Textual representation of cabal version
 cabalVersion' :: String
 cabalVersion' =
-#if defined(Cabal22) || defined(Cabal24)
+#if defined(Cabal22OrLater)
     prettyShow cabalVersion
 #elif defined(Cabal20)
     CabalVersion.showVersion cabalVersion
@@ -694,7 +890,7 @@ ordNub = go S.empty
   where
     go :: Set a -> [a] -> [a]
     go _   []     = []
-    go acc (x:xs)
+    go !acc (x:xs)
         | S.member x acc = go acc xs
         | otherwise      = x : go (S.insert x acc) xs
 
@@ -762,7 +958,8 @@ defaultConfig = Config
 
 main' :: Config Identity -> IO ()
 main' Config{cfgInputFile, cfgHPackExe} =
-    print =<< getCabalConfiguration cfgHPackExe (runIdentity cfgInputFile)
+    hPutBuilder stdout . renderSexp =<<
+        getCabalConfiguration cfgHPackExe (runIdentity cfgInputFile)
 
 main :: IO ()
 main = do
