@@ -66,7 +66,7 @@ matrix:
       compiler: "GHC 8.6.5, Cabal 2.4, EMACS 25.3"
       addons: {apt: {packages: [ghc-8.6.5, cabal-install-2.4, alex-3.1.7, happy-1.19.5], sources: [hvr-ghc]}}
 
-    - env: GHC=8.8.1 CABALVER=3.0 ALEXVER=3.1.7 HAPPYVER=1.19.5 INSTALL_HPACK=1 HLINT=1 EVM_EMACS=emacs-25.3-travis
+    - env: GHC=8.8.1 CABALVER=3.0 ALEXVER=3.1.7 HAPPYVER=1.19.5 INSTALL_HPACK=0 HLINT=0 EVM_EMACS=emacs-25.3-travis
       compiler: "GHC 8.8.1, Cabal 3.0, EMACS 25.3"
       addons: {apt: {packages: [ghc-8.8.1, cabal-install-3.0, alex-3.1.7, happy-1.19.5], sources: [hvr-ghc]}}
 
