@@ -854,7 +854,7 @@ depPkgName' =
 #if defined(Cabal20OrLater)
     depPkgName
 #else
-    \(Dependency x _) -> x
+    let f (Dependency x _) = x in f
 #endif
 
 unPackageName' :: PackageName -> String
@@ -862,7 +862,7 @@ unPackageName' =
 #if defined(Cabal20OrLater)
     unPackageName
 #else
-    \(PackageName x) -> x
+    let f (PackageName x) = x in f
 #endif
 
 
