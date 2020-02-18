@@ -8,6 +8,7 @@ master (in development)
 - Improve `flycheck-haskell-setup` to perform initialization the first time a Haskell file is opened [https://github.com/flycheck/flycheck/issues/1346]
 - Support `hpack` package description format [GH-85]
 - Properly collect options from foreign library sections available starting with Cabal 2.0
+- Fix escaping issues with paths on Windows [GH-102]
 
 0.8 (May 24, 2016)
 ==================

@@ -143,7 +143,7 @@ import Language.Haskell.Extension (Extension(..),Language(..))
 import System.Console.GetOpt
 import System.Environment (getArgs)
 import System.Exit (ExitCode(..), exitFailure, exitSuccess)
-import System.FilePath ((</>),dropFileName,normalise)
+import System.FilePath ((</>), dropFileName, normalise, isPathSeparator)
 import System.Info (compilerVersion)
 import System.IO (Handle, hGetContents, hPutStrLn, stderr, stdout)
 import System.Process (readProcessWithExitCode)
@@ -216,6 +216,12 @@ import Distribution.ParseUtils (locatedErrorMsg)
 import Distribution.Types.LibraryName (libraryNameString)
 #endif
 
+newtype UnixFilepath = UnixFilepath { unUnixFilepath :: C8.ByteString }
+  deriving (Eq, Ord)
+
+mkUnixFilepath :: FilePath -> UnixFilepath
+mkUnixFilepath = UnixFilepath . C8.map (\c -> if isPathSeparator c then '/' else c) . C8.pack . normalise
+
 data Sexp
     = SList [Sexp]
     | SString C8.ByteString
@@ -273,6 +279,9 @@ class ToSexp a  where
 
 instance ToSexp C8.ByteString where
     toSexp = SString
+
+instance ToSexp UnixFilepath where
+    toSexp = SString . unUnixFilepath
 
 instance ToSexp Extension where
     toSexp (EnableExtension ext) = toSexp (C8.pack (show ext))
@@ -334,7 +343,7 @@ getBuildDirectories
     :: TargetTool
     -> PackageDescription
     -> FilePath
-    -> IO ([FilePath], [FilePath])
+    -> IO ([UnixFilepath], [UnixFilepath])
 getBuildDirectories tool pkgDesc cabalDir = do
     distDir' <- distDir tool
     let buildDir   :: FilePath
@@ -369,7 +378,7 @@ getBuildDirectories tool pkgDesc cabalDir = do
         buildDirs' = case library pkgDesc of
             Just _  -> buildDir : buildDirs
             Nothing -> buildDirs
-    return (buildDirs', autogenDirs)
+    return (map mkUnixFilepath buildDirs', map mkUnixFilepath autogenDirs)
 
 getAutogenDirs :: FilePath -> [String] -> IO [FilePath]
 getAutogenDirs buildDir componentNames =
@@ -451,13 +460,13 @@ dumpPackageDescription pkgDesc projectDir = do
     let packageName = C8.pack $ unPackageName' $ pkgName $ package pkgDesc
     return $
         SList
-            [ cons (sym "build-directories") (ordNub (map (C8.pack . normalise) buildDirs))
-            , cons (sym "source-directories") sourceDirs
+            [ cons (sym "build-directories") (ordNub (buildDirs :: [UnixFilepath]))
+            , cons (sym "source-directories") (sourceDirs :: [UnixFilepath])
             , cons (sym "extensions") exts
             , cons (sym "languages") langs
             , cons (sym "dependencies") deps
             , cons (sym "other-options") (cppOpts ++ ghcOpts)
-            , cons (sym "autogen-directories") (map (C8.pack . normalise) autogenDirs)
+            , cons (sym "autogen-directories") (autogenDirs :: [UnixFilepath])
             , cons (sym "should-include-version-header") [not ghcIncludesVersionMacro]
 #if defined(Cabal20OrLater)
             , cons (sym "package-env-exists") [packageEnvExists]
@@ -469,8 +478,8 @@ dumpPackageDescription pkgDesc projectDir = do
     buildInfo :: [BuildInfo]
     buildInfo = allBuildInfo pkgDesc
 
-    sourceDirs :: [C8.ByteString]
-    sourceDirs = ordNub (map (C8.pack . normalise) (getSourceDirectories buildInfo projectDir))
+    sourceDirs :: [UnixFilepath]
+    sourceDirs = ordNub (map mkUnixFilepath (getSourceDirectories buildInfo projectDir))
 
     exts :: [Extension]
     exts = nub (concatMap usedExtensions buildInfo)
