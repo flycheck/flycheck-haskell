@@ -191,7 +191,7 @@ import Distribution.PackageDescription
 
 #if defined(Cabal22OrLater)
 import Distribution.Pretty (prettyShow)
-import Distribution.Types.GenericPackageDescription (mkFlagAssignment)
+import Distribution.PackageDescription (mkFlagAssignment)
 #endif
 
 #if defined(Cabal22OrLater)
