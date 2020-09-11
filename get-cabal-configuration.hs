@@ -227,7 +227,7 @@ import Distribution.PackageDescription.Parse
 import Distribution.ParseUtils (locatedErrorMsg)
 #endif
 
-#if defined(Cabal30)
+#if defined(Cabal30OrLater)
 import Distribution.Types.LibraryName (libraryNameString)
 #endif
 
@@ -681,6 +681,7 @@ parsePkgDescr _fileName cabalFileContents =
         (_warnings, res) ->
             case res of
                 Left (_version, errs) -> Left $ map (showPError _fileName) $ toList errs
+                Right x -> return x
 #elif defined(Cabal22OrLater)
     case runParseResult $ parseGenericPackageDescription $ unCabalFileContents cabalFileContents of
         (_warnings, res) ->
@@ -813,7 +814,7 @@ allLibraries' =
 
 libName' :: Library -> Maybe String
 libName' =
-#if defined(Cabal30)
+#if defined(Cabal30OrLater)
     fmap unUnqualComponentName . libraryNameString . libName
 #elif defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
     fmap unUnqualComponentName . libName
