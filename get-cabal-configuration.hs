@@ -197,7 +197,9 @@ import Distribution.Pretty (prettyShow)
 #if defined(Cabal300rLater)
 import Distribution.PackageDescription (mkFlagAssignment)
 #else
+# if defined(Cabal2020rLater)
 import Distribution.Types.GenericPackageDescription (mkFlagAssignment)
+# endif
 #endif
 
 #if defined(Cabal22OrLater)
