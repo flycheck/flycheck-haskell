@@ -36,6 +36,7 @@ module Main (main) where
 #if defined(GHC_INCLUDES_VERSION_MACRO)
 # if MIN_VERSION_Cabal(3, 0, 0)
 #  define Cabal30 1
+#  define Cabal300rLater 1
 #  define Cabal22OrLater 1
 #  define Cabal20OrLater 1
 # elif MIN_VERSION_Cabal(2, 3, 0)
@@ -191,7 +192,12 @@ import Distribution.PackageDescription
 
 #if defined(Cabal22OrLater)
 import Distribution.Pretty (prettyShow)
+#endif
+
+#if defined(Cabal300rLater)
 import Distribution.PackageDescription (mkFlagAssignment)
+#else
+import Distribution.Types.GenericPackageDescription (mkFlagAssignment)
 #endif
 
 #if defined(Cabal22OrLater)
