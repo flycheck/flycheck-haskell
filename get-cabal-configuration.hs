@@ -34,8 +34,15 @@ module Main (main) where
 #endif
 
 #if defined(GHC_INCLUDES_VERSION_MACRO)
-# if MIN_VERSION_Cabal(3, 0, 0)
+# if MIN_VERSION_Cabal(3, 2, 0)
+#  define Cabal32 1
+#  define Cabal32OrLater 1
+#  define Cabal30OrLater 1
+#  define Cabal22OrLater 1
+#  define Cabal20OrLater 1
+# elif MIN_VERSION_Cabal(3, 0, 0)
 #  define Cabal30 1
+#  define Cabal30OrLater 1
 #  define Cabal22OrLater 1
 #  define Cabal20OrLater 1
 # elif MIN_VERSION_Cabal(2, 3, 0)
@@ -111,6 +118,9 @@ import Data.Maybe (maybeToList)
 #if __GLASGOW_HASKELL__ < 710
 import Data.Monoid
 #endif
+#if defined(Cabal32OrLater)
+import Data.List.NonEmpty (toList)
+#endif
 import Data.Set (Set)
 import qualified Data.Set as S
 #ifdef Cabal118OrLess
@@ -153,7 +163,7 @@ import qualified System.Process as Process
 import Data.Version (Version)
 #endif
 
-#if defined(Cabal24) || defined(Cabal30)
+#if defined(Cabal24) || defined(Cabal30) || defined(Cabal32)
 import Distribution.PackageDescription (allBuildDepends)
 #endif
 
@@ -191,13 +201,18 @@ import Distribution.PackageDescription
 
 #if defined(Cabal22OrLater)
 import Distribution.Pretty (prettyShow)
+#endif
+
+#if defined(Cabal32OrLater)
+import Distribution.PackageDescription (mkFlagAssignment)
+#elif defined(Cabal22OrLater)
 import Distribution.Types.GenericPackageDescription (mkFlagAssignment)
 #endif
 
 #if defined(Cabal22OrLater)
 import Distribution.PackageDescription.Parsec
        (runParseResult, readGenericPackageDescription, parseGenericPackageDescription)
-# if defined(Cabal30)
+# if defined(Cabal30OrLater)
 import Distribution.Parsec.Error (showPError)
 #else
 import Distribution.Parsec.Common (showPError)
@@ -212,7 +227,7 @@ import Distribution.PackageDescription.Parse
 import Distribution.ParseUtils (locatedErrorMsg)
 #endif
 
-#if defined(Cabal30)
+#if defined(Cabal30OrLater)
 import Distribution.Types.LibraryName (libraryNameString)
 #endif
 
@@ -627,7 +642,7 @@ readHPackPkgDescr exe configFile projectDir = do
 
 buildDepends' :: PackageDescription -> [Dependency]
 buildDepends' =
-#if defined(Cabal24) || defined(Cabal30)
+#if defined(Cabal24) || defined(Cabal30) || defined(Cabal32)
     allBuildDepends
 #else
     buildDepends
@@ -661,7 +676,13 @@ readCabalFileContentsFromHandle =
 
 parsePkgDescr :: FilePath -> CabalFileContents -> Either [String] GenericPackageDescription
 parsePkgDescr _fileName cabalFileContents =
-#if defined(Cabal22OrLater)
+#if defined(Cabal32OrLater)
+    case runParseResult $ parseGenericPackageDescription $ unCabalFileContents cabalFileContents of
+        (_warnings, res) ->
+            case res of
+                Left (_version, errs) -> Left $ map (showPError _fileName) $ toList errs
+                Right x -> return x
+#elif defined(Cabal22OrLater)
     case runParseResult $ parseGenericPackageDescription $ unCabalFileContents cabalFileContents of
         (_warnings, res) ->
             case res of
@@ -793,7 +814,7 @@ allLibraries' =
 
 libName' :: Library -> Maybe String
 libName' =
-#if defined(Cabal30)
+#if defined(Cabal30OrLater)
     fmap unUnqualComponentName . libraryNameString . libName
 #elif defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
     fmap unUnqualComponentName . libName
