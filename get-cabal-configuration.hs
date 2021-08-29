@@ -82,7 +82,9 @@ module Main (main) where
 #endif
 
 import qualified Data.ByteString.Char8 as C8
-#if __GLASGOW_HASKELL__ > 704
+#if __GLASGOW_HASKELL__ > 810
+import qualified Data.ByteString.Builder as CL8.Builder
+#elif __GLASGOW_HASKELL__ > 704
 import qualified Data.ByteString.Lazy.Builder as CL8.Builder
 #else
 import qualified Data.ByteString.Lazy.Char8 as CL8
