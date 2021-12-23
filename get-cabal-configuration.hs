@@ -82,10 +82,10 @@ module Main (main) where
 #endif
 
 import qualified Data.ByteString.Char8 as C8
-#if __GLASGOW_HASKELL__ > 810
-import qualified Data.ByteString.Builder as CL8.Builder
-#elif __GLASGOW_HASKELL__ > 704
-import qualified Data.ByteString.Lazy.Builder as CL8.Builder
+#if MIN_VERSION_bytestring(0, 10, 2)
+import qualified Data.ByteString.Builder as BS.Builder
+#elif MIN_VERSION_bytestring(0, 10, 0)
+import qualified Data.ByteString.Lazy.Builder as BS.Builder
 #else
 import qualified Data.ByteString.Lazy.Char8 as CL8
 #endif
@@ -251,17 +251,17 @@ data TargetTool = Cabal | Stack
 type GhcVersion = String
 #endif
 
-#if __GLASGOW_HASKELL__ > 704
-type Builder = CL8.Builder.Builder
+#if MIN_VERSION_bytestring(0, 10, 0)
+type Builder = BS.Builder.Builder
 
 builderFromByteString :: C8.ByteString -> Builder
-builderFromByteString = CL8.Builder.byteString
+builderFromByteString = BS.Builder.byteString
 
 builderFromChar :: Char -> Builder
-builderFromChar = CL8.Builder.char8
+builderFromChar = BS.Builder.char8
 
 hPutBuilder :: Handle -> Builder -> IO ()
-hPutBuilder = CL8.Builder.hPutBuilder
+hPutBuilder = BS.Builder.hPutBuilder
 
 #else
 type Builder = Endo CL8.ByteString
