@@ -26,9 +26,6 @@ jobs:
         - os: 'macOS-latest'
           ghc: 'latest'
           hpack: false
-        - os: 'windows-latest'
-          ghc: 'latest'
-          hpack: false
         # Configuration with hpack enabled
         - os: 'ubuntu-latest'
           ghc: 'latest'
