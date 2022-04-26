@@ -34,6 +34,7 @@ module Main (main) where
 #endif
 
 #if defined(GHC_INCLUDES_VERSION_MACRO)
+
 # if MIN_VERSION_Cabal(3, 6, 0)
 #  define Cabal36OrLater 1
 #  define Cabal32OrLater 1
@@ -63,10 +64,23 @@ module Main (main) where
 # elif MIN_VERSION_Cabal(2, 0, 0)
 #  define Cabal20OrLater 1
 # endif
+
+# if MIN_VERSION_bytestring(0, 10, 2)
+#  define bytestring_10_2_or_later 1
+#  define bytestring_10_0_or_later 1
+# elif MIN_VERSION_bytestring(0, 10, 0)
+#  define bytestring_10_0_or_later 1
+# endif
+
 #else
--- Hack - we may actually be using Cabal 2.0 with e.g. 7.8 GHC. But
--- that's not likely to occur for average user who's relying on
--- packages bundled with GHC. The 2.0 Cabal is bundled starting with 8.2.1.
+
+# if __GLASGOW_HASKELL__ > 810
+#  define bytestring_10_2_or_later 1
+#  define bytestring_10_0_or_later 1
+# elif __GLASGOW_HASKELL__ > 704
+#  define bytestring_10_0_or_later 1
+#  define bytestring_10_0_or_later 1
+# endif
 
 #endif
 
@@ -85,9 +99,9 @@ module Main (main) where
 #endif
 
 import qualified Data.ByteString.Char8 as C8
-#if MIN_VERSION_bytestring(0, 10, 2)
+#if defined(bytestring_10_2_or_later)
 import qualified Data.ByteString.Builder as BS.Builder
-#elif MIN_VERSION_bytestring(0, 10, 0)
+#elif defined(bytestring_10_0_or_later)
 import qualified Data.ByteString.Lazy.Builder as BS.Builder
 #else
 import qualified Data.ByteString.Lazy.Char8 as CL8
@@ -128,7 +142,7 @@ import Data.List.NonEmpty (toList)
 #endif
 import Data.Set (Set)
 import qualified Data.Set as S
-#ifdef Cabal118OrLess
+#if defined(Cabal118OrLess)
 import Distribution.Compiler
        (CompilerFlavor(GHC), CompilerId(CompilerId), buildCompilerFlavor)
 #else
@@ -236,7 +250,7 @@ import Distribution.ParseUtils (locatedErrorMsg)
 import Distribution.Types.LibraryName (libraryNameString)
 #endif
 
-#ifdef Cabal36OrLater
+#if defined(Cabal36OrLater)
 import Distribution.Utils.Path (getSymbolicPath)
 #endif
 
@@ -258,7 +272,7 @@ data TargetTool = Cabal | Stack
 type GhcVersion = String
 #endif
 
-#if MIN_VERSION_bytestring(0, 10, 0)
+#if defined(bytestring_10_0_or_later)
 type Builder = BS.Builder.Builder
 
 builderFromByteString :: C8.ByteString -> Builder
@@ -599,7 +613,7 @@ getComponents packageName pkgDescr =
             TestSuiteLibV09 _ modName -> (Nothing, Just modName)
             TestSuiteUnsupported{}    -> (Nothing, Nothing)
     ]
-#ifdef Cabal114OrMore
+#if defined(Cabal114OrMore)
     ++
     [ (CTBenchmark, C8.pack (benchmarkName' tst), exeFile, biMods bi)
     | tst <- benchmarks pkgDescr
@@ -861,7 +875,7 @@ testName' =
     testName
 #endif
 
-#ifdef Cabal114OrMore
+#if defined(Cabal114OrMore)
 benchmarkName' :: Benchmark -> FilePath
 benchmarkName' =
 # if defined(Cabal20OrLater)
@@ -890,7 +904,7 @@ getTestNames =
 
 getBenchmarkNames :: PackageDescription -> [String]
 getBenchmarkNames =
-#ifdef Cabal114OrMore
+#if defined(Cabal114OrMore)
     map benchmarkName' . benchmarks
 #else
     const []
