@@ -1,0 +1,81 @@
+name: CI
+on:
+  push:
+    branches:
+      - master
+  pull_request: {} # Validate all PRs
+  schedule:
+    # Run once per month.
+    - cron: '0 0 1 * *'
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: ${{ matrix.os }} - ${{ matrix.ghc }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        os: ['ubuntu-latest']
+        ghc: ['7.10', '8.0', '8.2', '8.4', '8.6', '8.8', '8.10', '9.0', '9.2']
+        hpack: [false]
+        include:
+        - os: 'macOS-latest'
+          ghc: 'latest'
+          hpack: false
+        - os: 'windows-latest'
+          ghc: 'latest'
+          hpack: false
+        # Configuration with hpack enabled
+        - os: 'ubuntu-latest'
+          ghc: 'latest'
+          hpack: true
+    steps:
+    - uses: actions/checkout@v2
+    - uses: haskell/actions/setup@v1.2
+      id: setup-haskell-cabal
+      with:
+        ghc-version: ${{ matrix.ghc }}
+    - name: Update cabal package database
+      run: cabal update
+
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.6'
+        architecture: 'x64'
+
+    - uses: purcell/setup-emacs@master
+      with:
+        version: '28.1'
+
+    - uses: conao3/setup-cask@master
+      with:
+        version: '0.8.8'
+
+
+    - name: Compile
+      run: make compile
+
+    - name: 'Set up HLint'
+      uses: haskell/actions/hlint-setup@v2
+
+    - name: 'Run HLint'
+      uses: haskell/actions/hlint-run@v2
+
+    - uses: actions/cache@v2
+      name: Cache cabal stuff
+      if: ${{ matrix.hpack }}
+      with:
+        path: ${{ steps.setup-haskell-cabal.outputs.cabal-store }}
+        key: ${{ runner.os }}-${{ matrix.ghc }}
+
+    - name: Install hpack
+      if: ${{ matrix.hpack }}
+      run: cabal install hpack
+
+    - name: Run tests
+      run: make test
+
