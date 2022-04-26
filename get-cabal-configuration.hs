@@ -92,7 +92,7 @@ module Main (main) where
 # define Cabal118OrLess 1
 #endif
 
-#if __GLASGOW_HASKELL__ <= 763
+#if __GLASGOW_HASKELL__ <= 706
 #undef HAVE_DATA_FUNCTOR_IDENTITY
 #else
 #define HAVE_DATA_FUNCTOR_IDENTITY
