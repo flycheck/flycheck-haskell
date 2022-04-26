@@ -1,4 +1,4 @@
--- Copyright (C) 2016-2019 Sergey Vinokurov <serg.foo@gmail.com>
+-- Copyright (C) 2016-2022 Sergey Vinokurov <serg.foo@gmail.com>
 -- Copyright (C) 2014-2016 Sebastian Wiesner <swiesner@lunaryorn.com>
 -- Copyright (C) 2016-2018 Danny Navarro <j@dannynavarro.net>
 -- Copyright (C) 2015 Mark Karpov <markkarpov@opmbx.org>
@@ -34,19 +34,27 @@ module Main (main) where
 #endif
 
 #if defined(GHC_INCLUDES_VERSION_MACRO)
-# if MIN_VERSION_Cabal(3, 2, 0)
-#  define Cabal32 1
+
+# if MIN_VERSION_Cabal(3, 6, 0)
+#  define Cabal36OrLater 1
 #  define Cabal32OrLater 1
 #  define Cabal30OrLater 1
+#  define Cabal24OrLater 1
+#  define Cabal22OrLater 1
+#  define Cabal20OrLater 1
+# elif MIN_VERSION_Cabal(3, 2, 0)
+#  define Cabal32OrLater 1
+#  define Cabal30OrLater 1
+#  define Cabal24OrLater 1
 #  define Cabal22OrLater 1
 #  define Cabal20OrLater 1
 # elif MIN_VERSION_Cabal(3, 0, 0)
-#  define Cabal30 1
 #  define Cabal30OrLater 1
+#  define Cabal24OrLater 1
 #  define Cabal22OrLater 1
 #  define Cabal20OrLater 1
 # elif MIN_VERSION_Cabal(2, 3, 0)
-#  define Cabal24 1
+#  define Cabal24OrLater 1
 #  define Cabal22OrLater 1
 #  define Cabal20OrLater 1
 # elif MIN_VERSION_Cabal(2, 1, 0)
@@ -54,16 +62,25 @@ module Main (main) where
 #  define Cabal22OrLater 1
 #  define Cabal20OrLater 1
 # elif MIN_VERSION_Cabal(2, 0, 0)
-#  define Cabal20 1
 #  define Cabal20OrLater 1
 # endif
+
+# if MIN_VERSION_bytestring(0, 10, 2)
+#  define bytestring_10_2_or_later 1
+#  define bytestring_10_0_or_later 1
+# elif MIN_VERSION_bytestring(0, 10, 0)
+#  define bytestring_10_0_or_later 1
+# endif
+
 #else
--- Hack - we may actually be using Cabal 2.0 with e.g. 7.8 GHC. But
--- that's not likely to occur for average user who's relying on
--- packages bundled with GHC. The 2.0 Cabal is bundled starting with 8.2.1.
-# undef Cabal24
-# undef Cabal22
-# undef Cabal20
+
+# if __GLASGOW_HASKELL__ > 810
+#  define bytestring_10_2_or_later 1
+#  define bytestring_10_0_or_later 1
+# elif __GLASGOW_HASKELL__ > 704
+#  define bytestring_10_0_or_later 1
+#  define bytestring_10_0_or_later 1
+# endif
 
 #endif
 
@@ -75,16 +92,16 @@ module Main (main) where
 # define Cabal118OrLess 1
 #endif
 
-#if __GLASGOW_HASKELL__ <= 763
+#if __GLASGOW_HASKELL__ <= 706
 #undef HAVE_DATA_FUNCTOR_IDENTITY
 #else
 #define HAVE_DATA_FUNCTOR_IDENTITY
 #endif
 
 import qualified Data.ByteString.Char8 as C8
-#if MIN_VERSION_bytestring(0, 10, 2)
+#if defined(bytestring_10_2_or_later)
 import qualified Data.ByteString.Builder as BS.Builder
-#elif MIN_VERSION_bytestring(0, 10, 0)
+#elif defined(bytestring_10_0_or_later)
 import qualified Data.ByteString.Lazy.Builder as BS.Builder
 #else
 import qualified Data.ByteString.Lazy.Char8 as CL8
@@ -125,7 +142,7 @@ import Data.List.NonEmpty (toList)
 #endif
 import Data.Set (Set)
 import qualified Data.Set as S
-#ifdef Cabal118OrLess
+#if defined(Cabal118OrLess)
 import Distribution.Compiler
        (CompilerFlavor(GHC), CompilerId(CompilerId), buildCompilerFlavor)
 #else
@@ -161,11 +178,11 @@ import System.IO (Handle, hGetContents, hPutStrLn, stderr, stdout)
 import System.Process (readProcessWithExitCode)
 import qualified System.Process as Process
 
-#if __GLASGOW_HASKELL__ >= 710 && !defined(Cabal20) && !defined(Cabal22OrLater)
+#if __GLASGOW_HASKELL__ >= 710 && !defined(Cabal20OrLater) && !defined(Cabal22OrLater)
 import Data.Version (Version)
 #endif
 
-#if defined(Cabal24) || defined(Cabal30) || defined(Cabal32)
+#if defined(Cabal24OrLater)
 import Distribution.PackageDescription (allBuildDepends)
 #endif
 
@@ -219,7 +236,7 @@ import Distribution.Parsec.Error (showPError)
 #else
 import Distribution.Parsec.Common (showPError)
 # endif
-#elif defined(Cabal20)
+#elif defined(Cabal20OrLater)
 import Distribution.PackageDescription.Parse
        (ParseResult(..), readGenericPackageDescription, parseGenericPackageDescription)
 import Distribution.ParseUtils (locatedErrorMsg)
@@ -231,6 +248,10 @@ import Distribution.ParseUtils (locatedErrorMsg)
 
 #if defined(Cabal30OrLater)
 import Distribution.Types.LibraryName (libraryNameString)
+#endif
+
+#if defined(Cabal36OrLater)
+import Distribution.Utils.Path (getSymbolicPath)
 #endif
 
 newtype UnixFilepath = UnixFilepath { unUnixFilepath :: C8.ByteString }
@@ -251,7 +272,7 @@ data TargetTool = Cabal | Stack
 type GhcVersion = String
 #endif
 
-#if MIN_VERSION_bytestring(0, 10, 0)
+#if defined(bytestring_10_0_or_later)
 type Builder = BS.Builder.Builder
 
 builderFromByteString :: C8.ByteString -> Builder
@@ -409,7 +430,15 @@ getAutogenDirs buildDir componentNames =
 
 getSourceDirectories :: [BuildInfo] -> FilePath -> [String]
 getSourceDirectories buildInfo cabalDir =
-    map (cabalDir </>) (concatMap hsSourceDirs buildInfo)
+    map (cabalDir </>) (concatMap hsSourceDirs' buildInfo)
+
+hsSourceDirs' :: BuildInfo -> [FilePath]
+hsSourceDirs' =
+#if defined(Cabal36OrLater)
+    map getSymbolicPath . hsSourceDirs
+#else
+    hsSourceDirs
+#endif
 
 #if defined(Cabal20OrLater)
 doesPackageEnvExist :: GhcVersion -> FilePath -> IO Bool
@@ -584,7 +613,7 @@ getComponents packageName pkgDescr =
             TestSuiteLibV09 _ modName -> (Nothing, Just modName)
             TestSuiteUnsupported{}    -> (Nothing, Nothing)
     ]
-#ifdef Cabal114OrMore
+#if defined(Cabal114OrMore)
     ++
     [ (CTBenchmark, C8.pack (benchmarkName' tst), exeFile, biMods bi)
     | tst <- benchmarks pkgDescr
@@ -644,7 +673,7 @@ readHPackPkgDescr exe configFile projectDir = do
 
 buildDepends' :: PackageDescription -> [Dependency]
 buildDepends' =
-#if defined(Cabal24) || defined(Cabal30) || defined(Cabal32)
+#if defined(Cabal24OrLater)
     allBuildDepends
 #else
     buildDepends
@@ -690,7 +719,7 @@ parsePkgDescr _fileName cabalFileContents =
             case res of
                 Left (_version, errs) -> Left $ map (showPError _fileName) errs
                 Right x -> return x
-#elif defined(Cabal20)
+#elif defined(Cabal20OrLater)
     case parseGenericPackageDescription $ unCabalFileContents cabalFileContents of
         ParseFailed failure ->
             let (_line, msg) = locatedErrorMsg failure
@@ -722,7 +751,7 @@ getConcretePackageDescription genericDesc = do
         buildCompilerId
         []                    -- Additional constraints
         genericDesc
-#elif defined(Cabal20)
+#elif defined(Cabal20OrLater)
     let enabled :: ComponentRequestedSpec
         enabled = ComponentRequestedSpec
             { testsRequested      = True
@@ -818,7 +847,7 @@ libName' :: Library -> Maybe String
 libName' =
 #if defined(Cabal30OrLater)
     fmap unUnqualComponentName . libraryNameString . libName
-#elif defined(Cabal20) || defined(Cabal22) || defined(Cabal24)
+#elif defined(Cabal20OrLater)
     fmap unUnqualComponentName . libName
 #else
     const Nothing
@@ -846,7 +875,7 @@ testName' =
     testName
 #endif
 
-#ifdef Cabal114OrMore
+#if defined(Cabal114OrMore)
 benchmarkName' :: Benchmark -> FilePath
 benchmarkName' =
 # if defined(Cabal20OrLater)
@@ -875,7 +904,7 @@ getTestNames =
 
 getBenchmarkNames :: PackageDescription -> [String]
 getBenchmarkNames =
-#ifdef Cabal114OrMore
+#if defined(Cabal114OrMore)
     map benchmarkName' . benchmarks
 #else
     const []
@@ -903,7 +932,7 @@ cabalVersion' :: String
 cabalVersion' =
 #if defined(Cabal22OrLater)
     prettyShow cabalVersion
-#elif defined(Cabal20)
+#elif defined(Cabal20OrLater)
     CabalVersion.showVersion cabalVersion
 #else
     showVersion cabalVersion

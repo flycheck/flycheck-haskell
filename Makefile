@@ -22,7 +22,8 @@ EMACSBATCH = $(EMACS) -Q --batch $(EMACSFLAGS)
 .PHONY: compile dist \
 	lint test \
 	clean clean-elc clean-dist clean-deps \
-	deps
+	deps \
+	check
 
 # Build targets
 compile : $(EL_OBJS) $(HS_OBJS)
@@ -62,6 +63,9 @@ clean-deps :
 
 %: %.hs
 	$(GHC) $(GHCFLAGS) -outputdir $(HS_BUILDDIR) -o $@ $<
+
+check: $(EL_OBJS)
+	$(GHC) $(GHCFLAGS) -fno-code get-cabal-configuration.hs
 
 $(PKGDIR) : Cask
 	$(CASK) install
