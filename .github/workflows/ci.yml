@@ -82,5 +82,6 @@ jobs:
       run: cabal install hpack
 
     - name: Run tests
-      run: make test
+      run: |
+        PATH="/home/runner/.cabal/bin/:$PATH" make test
 
