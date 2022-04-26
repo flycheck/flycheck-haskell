@@ -9,6 +9,7 @@ master (in development)
 - Support `hpack` package description format [GH-85]
 - Properly collect options from foreign library sections available starting with Cabal 2.0
 - Fix escaping issues with paths on Windows [GH-102]
+- Support GHC 9.2.2 with Cabal 3.6 [GH-114]
 
 0.8 (May 24, 2016)
 ==================
