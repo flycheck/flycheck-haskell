@@ -53,6 +53,7 @@ module Main (main) where
 #  define Cabal22OrLater 1
 #  define Cabal20OrLater 1
 # elif MIN_VERSION_Cabal(2, 3, 0)
+#  define Cabal24OrLater 1
 #  define Cabal22OrLater 1
 #  define Cabal20OrLater 1
 # elif MIN_VERSION_Cabal(2, 1, 0)
