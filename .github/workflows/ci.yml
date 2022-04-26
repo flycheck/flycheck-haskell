@@ -22,14 +22,17 @@ jobs:
         os: ['ubuntu-latest']
         ghc: ['7.10', '8.0', '8.2', '8.4', '8.6', '8.8', '8.10', '9.0', '9.2']
         hpack: [false]
+        link: [false]
         include:
         - os: 'macOS-latest'
           ghc: 'latest'
           hpack: false
+          link: true
         # Configuration with hpack enabled
         - os: 'ubuntu-latest'
           ghc: 'latest'
           hpack: true
+          link: true
     steps:
     - uses: actions/checkout@v2
     - uses: haskell/actions/setup@v1.2
@@ -53,7 +56,12 @@ jobs:
         version: '0.8.8'
 
 
+    - name: Check
+      if: ${{ !matrix.link }}
+      run: make check
+
     - name: Compile
+      if: ${{ matrix.link }}
       run: make compile
 
     - name: 'Set up HLint'
