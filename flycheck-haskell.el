@@ -150,18 +150,28 @@ Take the base command from `flycheck-haskell-runghc-command'."
   (append flycheck-haskell-runghc-command args nil))
 
 (defun flycheck-haskell--read-configuration-with-helper (command)
-  (with-temp-buffer
-    ;; Hack around call-process' limitation handling standard error
-    (let ((error-file (make-temp-file "flycheck-haskell-errors")))
-      (pcase (apply 'call-process (car command) nil (list t error-file) nil (cdr command))
-        (0 (delete-file error-file)
-           (goto-char (point-min))
-           (read (current-buffer)))
-        (retcode (insert-file-contents error-file)
-                 (delete-file error-file)
-                 (message "Reading Haskell configuration failed with exit code %s and output:\n%s"
-                          retcode (buffer-string))
-                 nil)))))
+  ;; Copy enivronment variables into the new process, since
+  ;; with-temp-buffer will re-use the variables' defaults, even if
+  ;; they have been changed in this buffer by e.g. envrc-mode.
+  ;; See https://github.com/purcell/envrc/issues/12.
+  (let ((env process-environment)
+        (path exec-path))
+    (with-temp-buffer
+      ;; Copy the entire environment just in case there's something we need.
+      (setq-local process-environment env)
+      ;; Set path so we can find the command.
+      (setq-local exec-path path)
+      ;; Hack around call-process' limitation handling standard error
+      (let ((error-file (make-temp-file "flycheck-haskell-errors")))
+        (pcase (apply 'call-process (car command) nil (list t error-file) nil (cdr command))
+          (0 (delete-file error-file)
+             (goto-char (point-min))
+             (read (current-buffer)))
+          (retcode (insert-file-contents error-file)
+                   (delete-file error-file)
+                   (message "Reading Haskell configuration failed with exit code %s and output:\n%s"
+                            retcode (buffer-string))
+                   nil))))))
 
 (defun flycheck-haskell-read-cabal-configuration (cabal-file)
   "Read the Cabal configuration from CABAL-FILE."
