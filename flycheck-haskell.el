@@ -80,6 +80,7 @@
       (stack-exe
        `(,stack-exe "--verbosity" "silent" "runghc" "--no-ghc-package-path" "--" "-i"
                     "-packageCabal"
+                    "-packageCabal-syntax"
                     "-packagebase"
                     "-packagebytestring"
                     "-packagecontainers"
@@ -89,6 +90,7 @@
       (runghc-exe
        `(,runghc-exe "--" "-i"
                      "-packageCabal"
+                     "-packageCabal-syntax"
                      "-packagebase"
                      "-packagebytestring"
                      "-packagecontainers"

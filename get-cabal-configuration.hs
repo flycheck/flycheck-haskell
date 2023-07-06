@@ -35,7 +35,15 @@ module Main (main) where
 
 #if defined(GHC_INCLUDES_VERSION_MACRO)
 
-# if MIN_VERSION_Cabal(3, 6, 0)
+# if MIN_VERSION_Cabal(3, 8, 0)
+#  define Cabal38OrLater 1
+#  define Cabal36OrLater 1
+#  define Cabal32OrLater 1
+#  define Cabal30OrLater 1
+#  define Cabal24OrLater 1
+#  define Cabal22OrLater 1
+#  define Cabal20OrLater 1
+# elif MIN_VERSION_Cabal(3, 6, 0)
 #  define Cabal36OrLater 1
 #  define Cabal32OrLater 1
 #  define Cabal30OrLater 1
@@ -229,8 +237,15 @@ import Distribution.Types.GenericPackageDescription (mkFlagAssignment)
 #endif
 
 #if defined(Cabal22OrLater)
+# if defined(Cabal38OrLater)
+import Distribution.Simple.PackageDescription
+       (readGenericPackageDescription)
+import Distribution.PackageDescription.Parsec
+       (runParseResult, parseGenericPackageDescription)
+# else
 import Distribution.PackageDescription.Parsec
        (runParseResult, readGenericPackageDescription, parseGenericPackageDescription)
+# endif
 # if defined(Cabal30OrLater)
 import Distribution.Parsec.Error (showPError)
 #else
