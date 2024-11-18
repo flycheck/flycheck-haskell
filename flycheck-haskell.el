@@ -342,6 +342,8 @@ buffer."
                            (cons "-hide-all-packages"
                                (seq-map (apply-partially #'concat "-package=")
                                         .dependencies)))
+                         (seq-map (apply-partially #'concat "-I")
+                                  .include-directories)
                          flycheck-ghc-args)))
     (setq-local flycheck-hlint-args
                 (flycheck-haskell--delete-dups
