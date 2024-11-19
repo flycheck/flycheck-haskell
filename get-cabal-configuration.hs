@@ -447,6 +447,10 @@ getSourceDirectories :: [BuildInfo] -> FilePath -> [String]
 getSourceDirectories buildInfo cabalDir =
     map (cabalDir </>) (concatMap hsSourceDirs' buildInfo)
 
+getIncludeDirectories :: [BuildInfo] -> FilePath -> [String]
+getIncludeDirectories buildInfo cabalDir =
+    map (cabalDir </>) (concatMap includeDirs buildInfo)
+
 hsSourceDirs' :: BuildInfo -> [FilePath]
 hsSourceDirs' =
 #if defined(Cabal36OrLater)
@@ -534,6 +538,7 @@ dumpPackageDescription pkgDesc projectDir = do
 #endif
             , cons (sym "package-name") [packageName]
             , cons (sym "components") $ getComponents packageName pkgDesc
+            , cons (sym "include-directories") (includeDirs :: [UnixFilepath])
             ]
   where
     buildInfo :: [BuildInfo]
@@ -541,6 +546,9 @@ dumpPackageDescription pkgDesc projectDir = do
 
     sourceDirs :: [UnixFilepath]
     sourceDirs = ordNub (map mkUnixFilepath (getSourceDirectories buildInfo projectDir))
+
+    includeDirs :: [UnixFilepath]
+    includeDirs = ordNub (map mkUnixFilepath (getIncludeDirectories buildInfo projectDir))
 
     exts :: [Extension]
     exts = nub (concatMap usedExtensions buildInfo)
