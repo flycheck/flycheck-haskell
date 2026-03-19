@@ -35,7 +35,16 @@ module Main (main) where
 
 #if defined(GHC_INCLUDES_VERSION_MACRO)
 
-# if MIN_VERSION_Cabal(3, 8, 0)
+# if MIN_VERSION_Cabal(3, 14, 0)
+#  define Cabal314OrLater 1
+#  define Cabal38OrLater 1
+#  define Cabal36OrLater 1
+#  define Cabal32OrLater 1
+#  define Cabal30OrLater 1
+#  define Cabal24OrLater 1
+#  define Cabal22OrLater 1
+#  define Cabal20OrLater 1
+# elif MIN_VERSION_Cabal(3, 8, 0)
 #  define Cabal38OrLater 1
 #  define Cabal36OrLater 1
 #  define Cabal32OrLater 1
@@ -265,7 +274,9 @@ import Distribution.ParseUtils (locatedErrorMsg)
 import Distribution.Types.LibraryName (libraryNameString)
 #endif
 
-#if defined(Cabal36OrLater)
+#if defined(Cabal314OrLater)
+import Distribution.Utils.Path (getSymbolicPath, unsafeMakeSymbolicPath)
+#elif defined(Cabal36OrLater)
 import Distribution.Utils.Path (getSymbolicPath)
 #endif
 
@@ -372,7 +383,12 @@ cons h t = SList (toSexp h : map toSexp t)
 
 -- | Get possible dist directory
 distDir :: TargetTool -> IO FilePath
-distDir Cabal = return defaultDistPref
+distDir Cabal = return
+#if defined(Cabal314OrLater)
+    (getSymbolicPath defaultDistPref)
+#else
+    defaultDistPref
+#endif
 distDir Stack = do
     res <- try $ readProcessWithExitCode "stack" ["path", "--dist-dir"] []
     return $ case res of
@@ -382,7 +398,11 @@ distDir Stack = do
   where
     defaultDistDir :: FilePath
     defaultDistDir =
+#if defined(Cabal314OrLater)
+        ".stack-work" </> getSymbolicPath defaultDistPref
+#else
         ".stack-work" </> defaultDistPref
+#endif
                       </> display buildPlatform
                       </> "Cabal-" ++ cabalVersion'
 #if defined(Cabal20OrLater)
@@ -449,7 +469,7 @@ getSourceDirectories buildInfo cabalDir =
 
 getIncludeDirectories :: [BuildInfo] -> FilePath -> [String]
 getIncludeDirectories buildInfo cabalDir =
-    map (cabalDir </>) (concatMap includeDirs buildInfo)
+    map (cabalDir </>) (concatMap includeDirs' buildInfo)
 
 hsSourceDirs' :: BuildInfo -> [FilePath]
 hsSourceDirs' =
@@ -457,6 +477,22 @@ hsSourceDirs' =
     map getSymbolicPath . hsSourceDirs
 #else
     hsSourceDirs
+#endif
+
+includeDirs' :: BuildInfo -> [FilePath]
+includeDirs' =
+#if defined(Cabal314OrLater)
+    map getSymbolicPath . includeDirs
+#else
+    includeDirs
+#endif
+
+-- | Unwrap a path that became a SymbolicPath/RelativePath in Cabal >= 3.12.
+getRelPath =
+#if defined(Cabal314OrLater)
+    getSymbolicPath
+#else
+    id
 #endif
 
 #if defined(Cabal20OrLater)
@@ -624,7 +660,7 @@ getComponents packageName pkgDescr =
     , let bi = foreignLibBuildInfo flib
     ] ++
 #endif
-    [ (CTExecutable, C8.pack (exeName' exe), Just (C8.pack (modulePath exe)), biMods bi)
+    [ (CTExecutable, C8.pack (exeName' exe), Just (C8.pack (getRelPath (modulePath exe))), biMods bi)
     | exe <- executables pkgDescr
     , let bi = buildInfo exe
     ] ++
@@ -632,7 +668,7 @@ getComponents packageName pkgDescr =
     | tst <- testSuites pkgDescr
     , let bi = testBuildInfo tst
     , let (exeFile, extraMod) = case testInterface tst of
-            TestSuiteExeV10 _ path    -> (Just (C8.pack path), Nothing)
+            TestSuiteExeV10 _ path    -> (Just (C8.pack (getRelPath path)), Nothing)
             TestSuiteLibV09 _ modName -> (Nothing, Just modName)
             TestSuiteUnsupported{}    -> (Nothing, Nothing)
     ]
@@ -642,7 +678,7 @@ getComponents packageName pkgDescr =
     | tst <- benchmarks pkgDescr
     , let bi = benchmarkBuildInfo tst
     , let exeFile = case benchmarkInterface tst of
-            BenchmarkExeV10 _ path -> Just (C8.pack path)
+            BenchmarkExeV10 _ path -> Just (C8.pack (getRelPath path))
             BenchmarkUnsupported{} -> Nothing
     ]
 #endif
@@ -704,7 +740,9 @@ buildDepends' =
 
 readGenericPkgDescr :: FilePath -> IO GenericPackageDescription
 readGenericPkgDescr =
-#if defined(Cabal20OrLater)
+#if defined(Cabal314OrLater)
+    \f -> readGenericPackageDescription silent Nothing (unsafeMakeSymbolicPath f)
+#elif defined(Cabal20OrLater)
     readGenericPackageDescription silent
 #else
     readPackageDescription silent
